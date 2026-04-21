@@ -63,6 +63,7 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     "conf_refresh_low": 0.35,
     "conf_refresh_high": 0.65,
     "refresh_patience": 0,
+    "refresh_decline_thr": 0.04,
 }
 
 
@@ -326,6 +327,10 @@ def normalize_runtime_config(
     refresh_patience = ai.get("refresh_patience")
     if refresh_patience is not None:
         params["refresh_patience"] = int(refresh_patience)
+
+    refresh_decline_thr = ai.get("refresh_decline_thr")
+    if refresh_decline_thr is not None:
+        params["refresh_decline_thr"] = float(refresh_decline_thr)
 
     # IMM physics params — extracted from nested imm: block in imm_tuned.yaml.
     imm_block = _as_mapping(cfg.get("imm"))

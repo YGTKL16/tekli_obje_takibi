@@ -77,11 +77,15 @@ ai:
   search_scale_boost: 0.0  # REJECT — do not tune
   # Faz D: Proactive template refresh — re-center AI search at KF-fused bbox
   # when confidence lingers in the moderate zone for refresh_patience frames.
-  # Uses set_state() (preserves template) — safe for false-positive triggers.
-  # rp4(h=.65,init): Delta=+0.0065 — bike3 -0.410 (init destroys template)
-  # rp8(h=.65,init): Delta=+0.0478 — bike3 -0.392 still (init destroys template)
-  # rp8(h=.50,init): Delta=+0.0132 — truck_night lost gains (zone too narrow)
-  # rp8(h=.65,set_state): PENDING — safe re-center, preserves template
-  conf_refresh_low:  0.35
-  conf_refresh_high: 0.65    # restored to wider zone
-  refresh_patience:  8       # patience=8 beats patience=4 for Surfing12/Wakeboard
+  # Declining-conf gate: best combination tested.
+  # thr=0.04: fires for genuine drift (truck_night -0.12, car1_s, air_cond)
+  #   but also catches fast natural dips (bike3 -0.407, surfer -0.099)
+  #   → net Delta +0.0511 (best overall)
+  # thr=0.10: bike3 STILL -0.389 (long drift > 0.10 still triggers),
+  #   reduced gains everywhere → +0.0225. Worse.
+  # trigger_max=0.45: +0.0383. trigger_max dual: +0.0183. All < thr=0.04.
+  # thr=0.04 is the committed winner.
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04  # committed winner

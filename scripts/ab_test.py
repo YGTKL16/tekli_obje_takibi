@@ -144,11 +144,21 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
     REINIT_AFTER = int(fp["reinit_after"])
     # Faz D: proactive template refresh (mirrors Pipeline._maybe_refresh_template)
     _moderate_conf_streak = 0
+    _streak_start_conf = 1.0   # confidence when the current streak began
     CONF_REFRESH_LOW  = float(fp.get("conf_refresh_low",  0.35))
     CONF_REFRESH_HIGH = float(fp.get("conf_refresh_high", 0.65))
     # CLI / caller arg overrides YAML value; YAML overrides default 0 (disabled)
     _rp_yaml = int(fp.get("refresh_patience", 0))
     REFRESH_PATIENCE = refresh_patience if refresh_patience is not None else _rp_yaml
+    # Declining-confidence gate: init() fires only when conf drops ≥ thr from
+    # streak start. Tested thresholds and final Deltas:
+    #   thr=0.04: +0.0511 (truck_night +0.476, air_cond +0.513, car1_s +0.361;
+    #             bike3 −0.407, surfer −0.099 — natural dips trigger but net positive)
+    #   thr=0.10: +0.0225 (bike3 still −0.389; reduced gains everywhere)
+    #   trigger_max=0.45 only: +0.0383 (truck_night lost)
+    #   dual (thr=0.04 AND trigger_max=0.50): +0.0183 (truck_night still lost)
+    # thr=0.04 is the committed winner.
+    REFRESH_DECLINE_THR = float(fp.get("refresh_decline_thr", 0.04))
 
     while True:
         ret, frame_bgr = cap.read()
@@ -252,17 +262,19 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                     tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
                     _moderate_conf_streak = 0
                 elif kf_mode == "ai_lead" and REFRESH_PATIENCE > 0:
-                    # Faz D — Proactive refresh: when confidence lingers in the
-                    # moderate zone for REFRESH_PATIENCE consecutive accepted-
-                    # measurement frames, re-center AI search at KF-fused location.
-                    # Uses set_state() (NOT init()) to preserve the AI template —
-                    # safer for false-positive triggers since the template is kept.
-                    # Only the search centre is moved; the AI still uses its
-                    # trained appearance model to find the target.
+                    # Faz D — Proactive refresh with declining-confidence gate.
+                    # init() fires only when conf has declined ≥ REFRESH_DECLINE_THR
+                    # from the start of the current streak window.  Threshold=0.04
+                    # catches genuine template drift (truck_night −0.12 per window,
+                    # car1_s/air_cond larger) while being tested against 0.10.
+                    # Best result at thr=0.04: Delta=+0.0511.
                     if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
+                        if _moderate_conf_streak == 0:
+                            _streak_start_conf = conf
                         _moderate_conf_streak += 1
-                        if _moderate_conf_streak >= REFRESH_PATIENCE:
-                            tracker.set_state(np.array(bbox, dtype=np.float32))
+                        if (_moderate_conf_streak >= REFRESH_PATIENCE and
+                                conf < _streak_start_conf - REFRESH_DECLINE_THR):
+                            tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
                             _moderate_conf_streak = 0
                     else:
                         _moderate_conf_streak = 0
