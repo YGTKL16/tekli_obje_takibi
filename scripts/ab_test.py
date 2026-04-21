@@ -84,7 +84,8 @@ SUBSET = [
 
 def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline",
                  gmc_enabled=False, adaptive_r_enabled=False,
-                 imm_cfg=None, imm_cfg_path=None, search_scale_boost=0.0):
+                 imm_cfg=None, imm_cfg_path=None, search_scale_boost=0.0,
+                 refresh_patience=None):
     video_path = os.path.join(DATA_ROOT, seq_info["video_path"])
     ann_path = seq_info.get("annotation_path")
     annotations = []
@@ -141,6 +142,13 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
     last_good_bbox = init_bbox
     reject_streak = 0
     REINIT_AFTER = int(fp["reinit_after"])
+    # Faz D: proactive template refresh (mirrors Pipeline._maybe_refresh_template)
+    _moderate_conf_streak = 0
+    CONF_REFRESH_LOW  = float(fp.get("conf_refresh_low",  0.35))
+    CONF_REFRESH_HIGH = float(fp.get("conf_refresh_high", 0.65))
+    # CLI / caller arg overrides YAML value; YAML overrides default 0 (disabled)
+    _rp_yaml = int(fp.get("refresh_patience", 0))
+    REFRESH_PATIENCE = refresh_patience if refresh_patience is not None else _rp_yaml
 
     while True:
         ret, frame_bgr = cap.read()
@@ -242,6 +250,19 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                     # Phase 1 — The Great Rescue: reinit AI template at KF location.
                     # init() renews template + centre (set_state only moved centre).
                     tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                    _moderate_conf_streak = 0
+                elif kf_mode == "ai_lead" and REFRESH_PATIENCE > 0:
+                    # Faz D — Proactive refresh: when confidence lingers in the
+                    # moderate zone for REFRESH_PATIENCE consecutive accepted-
+                    # measurement frames, re-init template at KF-fused location.
+                    # This breaks the staleness spiral before full track loss.
+                    if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
+                        _moderate_conf_streak += 1
+                        if _moderate_conf_streak >= REFRESH_PATIENCE:
+                            tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                            _moderate_conf_streak = 0
+                    else:
+                        _moderate_conf_streak = 0
             else:
                 ai_bbox, conf = tracker.track(frame_rgb)
                 bbox = ai_bbox.tolist() if isinstance(ai_bbox, np.ndarray) else list(ai_bbox)
@@ -306,6 +327,9 @@ def main():
     parser.add_argument("--search-scale-boost", type=float, default=None,
                         help="Singer-adaptive search window boost factor (overrides YAML value). "
                              "0.0 = disabled (default), >0 expands bbox by (1 + boost * singer_prob).")
+    parser.add_argument("--refresh-patience", type=int, default=None,
+                        help="Proactive template refresh patience (Faz D). "
+                             "0 = disabled, N = refresh after N consecutive moderate-conf frames.")
     args = parser.parse_args()
     tags = [f"Mode: {args.mode}"]
     if args.gmc:
@@ -322,6 +346,11 @@ def main():
     search_scale_boost = args.search_scale_boost if args.search_scale_boost is not None else _boost_from_yaml
     if search_scale_boost > 0:
         tags.append(f"SearchBoost: {search_scale_boost:.2f}")
+    # refresh_patience: CLI overrides YAML; YAML overrides default 0
+    _refresh_from_yaml = int(_fp_preview.get("refresh_patience", 0))
+    refresh_patience = args.refresh_patience if args.refresh_patience is not None else _refresh_from_yaml
+    if refresh_patience > 0:
+        tags.append(f"RefreshPatience: {refresh_patience}")
     print(", ".join(tags))
 
     manifest = load_manifest()
@@ -352,7 +381,8 @@ def main():
                                   kf_mode=args.mode, gmc_enabled=args.gmc,
                                   adaptive_r_enabled=args.adaptive_r,
                                   imm_cfg=imm_cfg, imm_cfg_path=args.imm_config,
-                                  search_scale_boost=search_scale_boost)
+                                  search_scale_boost=search_scale_boost,
+                                  refresh_patience=refresh_patience)
         auc_i, np_i = evaluate(gt, preds_imm)
         del preds_imm, gt
 

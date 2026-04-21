@@ -75,3 +75,9 @@ ai:
   # boost=1.0: Delta=-0.0718 (volleyball -0.466, basketball -0.417, Girl2 -0.266)
   # Root cause: set_state(expanded_bbox) corrupts AI template size on any Singer-firing seq.
   search_scale_boost: 0.0  # REJECT — do not tune
+  # Faz D: Proactive template refresh — re-init AI at KF-fused bbox when
+  # confidence lingers in the moderate zone for refresh_patience frames.
+  # Mirrors Pipeline._maybe_refresh_template.  0 = disabled (pending validation).
+  conf_refresh_low:  0.35
+  conf_refresh_high: 0.65
+  refresh_patience:  0     # 0 = disabled until validated live
