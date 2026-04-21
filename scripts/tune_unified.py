@@ -2,15 +2,19 @@
 """Unified Optuna IMM parameter tuning: hygiene + blend + KF physics.
 
 Combines both search spaces (tune_filter.py 10D + tune_kalman.py 5D) into
-a single 17D optimization with Leave-One-Dataset-Out cross-validation.
+a single 20D optimization with Leave-One-Dataset-Out cross-validation.
 
-Search space (17D):
+Search space (20D):
   KF Physics (4D):   q_scale, r_pos_scale, r_size_scale, pi_persist
   Decision  (3D):    conf_threshold, coast_threshold, max_coast_frames
   Blend     (2D):    alpha_conf_lo, alpha_conf_hi
   Hygiene   (4D):    reinit_after, max_area_frac, max_center_jump_frac, aspect_ratio_hi
   Smart     (4D):    conf_bypass_threshold, innovation_threshold,
                      sm_conf_threshold, sm_max_coast
+  Soft fusion (3D):  alpha_gate_k_conf, alpha_gate_lambda, reacq_r_decay
+
+Note: search_scale_boost (C2 REJECT) and C1 skip thresholds are EXCLUDED —
+they are disabled in live pipeline and have no effect in cached replay.
 
 All evaluation is cached (no TRT inference) — 500 trials in minutes.
 
@@ -127,12 +131,6 @@ def create_objective(cache_dir: str, baselines: dict, max_degradation: float):
             "alpha_gate_k_conf": trial.suggest_float("alpha_gate_k_conf", 0.0, 3.0),
             "alpha_gate_lambda":  trial.suggest_float("alpha_gate_lambda",  0.0, 0.3),
             "reacq_r_decay":      trial.suggest_float("reacq_r_decay",      0.0, 0.5),
-            # Faz C1b: IMM skip thresholds (4D)
-            "singer_skip_thr": trial.suggest_float("singer_skip_thr", 0.20, 0.55),
-            "cv_stable_thr":   trial.suggest_float("cv_stable_thr",   0.50, 0.90),
-            "cv_conf_min":     trial.suggest_float("cv_conf_min",     0.45, 0.80),
-            # Faz C2: Singer search window boost (1D)
-            "search_scale_boost": trial.suggest_float("search_scale_boost", 0.0, 3.0),
             # Fixed
             "aspect_ratio_lo": 0.1,
         }
@@ -239,7 +237,7 @@ def main():
     objective = create_objective(cache_dir, baselines, args.max_degradation)
 
     print(f"\n{'=' * 70}")
-    print(f"Starting Optuna: {args.n_trials} trials, 17D search, LODO CV")
+    print(f"Starting Optuna: {args.n_trials} trials, 20D search, LODO CV")
     print(f"{'=' * 70}\n")
 
     t0 = time.time()

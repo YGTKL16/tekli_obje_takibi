@@ -71,5 +71,7 @@ ai:
   singer_skip_thr: 0.35    # Singer > this → always run AI (manoeuvre guard)
   cv_stable_thr: 0.70      # CV > this → allow skip (DISABLED: skip_when_confident=false)
   cv_conf_min: 0.65        # conf > this required to allow CV skip
-  # Faz C2: Singer-adaptive search window expansion (0.0 = disabled)
-  search_scale_boost: 0.0  # bbox w/h multiplied by (1 + boost * singer_prob)
+  # Faz C2: Singer-adaptive search window expansion — REJECT (permanently 0.0)
+  # boost=1.0: Delta=-0.0718 (volleyball -0.466, basketball -0.417, Girl2 -0.266)
+  # Root cause: set_state(expanded_bbox) corrupts AI template size on any Singer-firing seq.
+  search_scale_boost: 0.0  # REJECT — do not tune

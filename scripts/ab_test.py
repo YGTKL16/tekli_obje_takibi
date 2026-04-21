@@ -84,7 +84,7 @@ SUBSET = [
 
 def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline",
                  gmc_enabled=False, adaptive_r_enabled=False,
-                 imm_cfg=None, imm_cfg_path=None):
+                 imm_cfg=None, imm_cfg_path=None, search_scale_boost=0.0):
     video_path = os.path.join(DATA_ROOT, seq_info["video_path"])
     ann_path = seq_info.get("annotation_path")
     annotations = []
@@ -186,15 +186,19 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                 predicted_state = np.array(kf.predict()).flatten()
                 # Phase 4: IMM manoeuvre probability for adaptive bypass threshold
                 p_maneuver = 0.0
+                mu_singer = 0.0
                 if hasattr(kf, "get_model_probabilities"):
                     _mu = np.array(kf.get_model_probabilities())
                     p_maneuver = float(_mu[1] + _mu[2])
+                    mu_singer = float(_mu[2])
                 observation = observe_with_guidance(
                     tracker,
                     frame_rgb,
                     predicted_state,
                     mode=kf_mode,
                     last_output_bbox=prev_output_bbox,
+                    singer_prob=mu_singer,
+                    search_scale_boost=search_scale_boost,
                 )
                 conf = observation.confidence
                 track_state = sm.step(conf)
@@ -221,6 +225,11 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                     maneuver_probability=p_maneuver,
                     maneuver_threshold=float(fp.get("maneuver_threshold", 0.0)),
                     maneuver_bypass_boost=float(fp.get("maneuver_bypass_boost", 0.0)),
+                    mahal_bypass_after=int(fp.get("mahal_bypass_after", 5)),
+                    coast_count=sm.coast_count(),
+                    alpha_gate_k_conf=float(fp.get("alpha_gate_k_conf", 0.0)),
+                    alpha_gate_lambda=float(fp.get("alpha_gate_lambda", 0.0)),
+                    reacq_r_decay=float(fp.get("reacq_r_decay", 0.0)),
                 )
                 bbox = step.bbox
                 reject_streak = step.reject_streak
@@ -294,6 +303,9 @@ def main():
     parser.add_argument("--imm-config", default=None,
                         help="Path to IMM tuned config YAML (e.g. configs/imm_tuned.yaml). "
                              "Applies q_scale/R/π and decision.* overrides to the IMM column.")
+    parser.add_argument("--search-scale-boost", type=float, default=None,
+                        help="Singer-adaptive search window boost factor (overrides YAML value). "
+                             "0.0 = disabled (default), >0 expands bbox by (1 + boost * singer_prob).")
     args = parser.parse_args()
     tags = [f"Mode: {args.mode}"]
     if args.gmc:
@@ -304,6 +316,12 @@ def main():
     if args.imm_config:
         imm_cfg = load_yaml_config(args.imm_config)
         tags.append(f"IMM: {os.path.basename(args.imm_config)}")
+    # search_scale_boost: CLI overrides YAML; YAML overrides default 0.0
+    _fp_preview = _load_filter_params(args.imm_config) if args.imm_config else _load_filter_params()
+    _boost_from_yaml = float(_fp_preview.get("search_scale_boost", 0.0))
+    search_scale_boost = args.search_scale_boost if args.search_scale_boost is not None else _boost_from_yaml
+    if search_scale_boost > 0:
+        tags.append(f"SearchBoost: {search_scale_boost:.2f}")
     print(", ".join(tags))
 
     manifest = load_manifest()
@@ -333,7 +351,8 @@ def main():
         preds_imm = run_sequence(tracker, seq_id, seq_info, manifest, use_kf=True,
                                   kf_mode=args.mode, gmc_enabled=args.gmc,
                                   adaptive_r_enabled=args.adaptive_r,
-                                  imm_cfg=imm_cfg, imm_cfg_path=args.imm_config)
+                                  imm_cfg=imm_cfg, imm_cfg_path=args.imm_config,
+                                  search_scale_boost=search_scale_boost)
         auc_i, np_i = evaluate(gt, preds_imm)
         del preds_imm, gt
 
