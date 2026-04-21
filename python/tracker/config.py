@@ -59,6 +59,10 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     "cv_conf_min": 0.65,       # conf > this required for CV skip
     # Faz C2: Singer-adaptive search window expansion (0.0 = disabled)
     "search_scale_boost": 0.0,
+    # Faz D: Proactive template refresh (0 = disabled)
+    "conf_refresh_low": 0.35,
+    "conf_refresh_high": 0.65,
+    "refresh_patience": 0,
 }
 
 
@@ -310,6 +314,18 @@ def normalize_runtime_config(
     search_scale_boost = ai.get("search_scale_boost")
     if search_scale_boost is not None:
         params["search_scale_boost"] = float(search_scale_boost)
+
+    conf_refresh_low = ai.get("conf_refresh_low")
+    if conf_refresh_low is not None:
+        params["conf_refresh_low"] = float(conf_refresh_low)
+
+    conf_refresh_high = ai.get("conf_refresh_high")
+    if conf_refresh_high is not None:
+        params["conf_refresh_high"] = float(conf_refresh_high)
+
+    refresh_patience = ai.get("refresh_patience")
+    if refresh_patience is not None:
+        params["refresh_patience"] = int(refresh_patience)
 
     # IMM physics params — extracted from nested imm: block in imm_tuned.yaml.
     imm_block = _as_mapping(cfg.get("imm"))

@@ -77,7 +77,10 @@ ai:
   search_scale_boost: 0.0  # REJECT — do not tune
   # Faz D: Proactive template refresh — re-init AI at KF-fused bbox when
   # confidence lingers in the moderate zone for refresh_patience frames.
-  # Mirrors Pipeline._maybe_refresh_template.  0 = disabled (pending validation).
+  # Mirrors Pipeline._maybe_refresh_template.
+  # rp4(high=0.65): Delta=+0.0065 — bike3 -0.410 catastrophe (91% in zone)
+  # rp8(high=0.65): Delta=+0.0478 — bike3 -0.392 still bad; surfer -0.098
+  # rp8(high=0.50): PENDING — narrow zone excludes high-conf sequences
   conf_refresh_low:  0.35
-  conf_refresh_high: 0.65
-  refresh_patience:  0     # 0 = disabled until validated live
+  conf_refresh_high: 0.50    # narrowed from 0.65; cuts bike3 zone 91%→25%
+  refresh_patience:  8       # validated: fewer false-positives than patience=4
