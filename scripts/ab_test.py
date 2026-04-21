@@ -254,12 +254,15 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                 elif kf_mode == "ai_lead" and REFRESH_PATIENCE > 0:
                     # Faz D — Proactive refresh: when confidence lingers in the
                     # moderate zone for REFRESH_PATIENCE consecutive accepted-
-                    # measurement frames, re-init template at KF-fused location.
-                    # This breaks the staleness spiral before full track loss.
+                    # measurement frames, re-center AI search at KF-fused location.
+                    # Uses set_state() (NOT init()) to preserve the AI template —
+                    # safer for false-positive triggers since the template is kept.
+                    # Only the search centre is moved; the AI still uses its
+                    # trained appearance model to find the target.
                     if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
                         _moderate_conf_streak += 1
                         if _moderate_conf_streak >= REFRESH_PATIENCE:
-                            tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                            tracker.set_state(np.array(bbox, dtype=np.float32))
                             _moderate_conf_streak = 0
                     else:
                         _moderate_conf_streak = 0

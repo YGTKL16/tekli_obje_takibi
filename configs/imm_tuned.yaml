@@ -75,12 +75,13 @@ ai:
   # boost=1.0: Delta=-0.0718 (volleyball -0.466, basketball -0.417, Girl2 -0.266)
   # Root cause: set_state(expanded_bbox) corrupts AI template size on any Singer-firing seq.
   search_scale_boost: 0.0  # REJECT — do not tune
-  # Faz D: Proactive template refresh — re-init AI at KF-fused bbox when
-  # confidence lingers in the moderate zone for refresh_patience frames.
-  # Mirrors Pipeline._maybe_refresh_template.
-  # rp4(high=0.65): Delta=+0.0065 — bike3 -0.410 catastrophe (91% in zone)
-  # rp8(high=0.65): Delta=+0.0478 — bike3 -0.392 still bad; surfer -0.098
-  # rp8(high=0.50): PENDING — narrow zone excludes high-conf sequences
+  # Faz D: Proactive template refresh — re-center AI search at KF-fused bbox
+  # when confidence lingers in the moderate zone for refresh_patience frames.
+  # Uses set_state() (preserves template) — safe for false-positive triggers.
+  # rp4(h=.65,init): Delta=+0.0065 — bike3 -0.410 (init destroys template)
+  # rp8(h=.65,init): Delta=+0.0478 — bike3 -0.392 still (init destroys template)
+  # rp8(h=.50,init): Delta=+0.0132 — truck_night lost gains (zone too narrow)
+  # rp8(h=.65,set_state): PENDING — safe re-center, preserves template
   conf_refresh_low:  0.35
-  conf_refresh_high: 0.50    # narrowed from 0.65; cuts bike3 zone 91%→25%
-  refresh_patience:  8       # validated: fewer false-positives than patience=4
+  conf_refresh_high: 0.65    # restored to wider zone
+  refresh_patience:  8       # patience=8 beats patience=4 for Surfing12/Wakeboard
