@@ -328,6 +328,10 @@ def normalize_runtime_config(
     if refresh_patience is not None:
         params["refresh_patience"] = int(refresh_patience)
 
+    conf_streak_mean_max = ai.get("conf_streak_mean_max")
+    if conf_streak_mean_max is not None:
+        params["conf_streak_mean_max"] = float(conf_streak_mean_max)
+
     refresh_decline_thr = ai.get("refresh_decline_thr")
     if refresh_decline_thr is not None:
         params["refresh_decline_thr"] = float(refresh_decline_thr)

@@ -151,12 +151,12 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
     _rp_yaml = int(fp.get("refresh_patience", 0))
     REFRESH_PATIENCE = refresh_patience if refresh_patience is not None else _rp_yaml
     # Declining-confidence gate: init() fires only when conf drops ≥ thr from
-    # streak start. Tested thresholds and final Deltas:
-    #   thr=0.04: +0.0511 (truck_night +0.476, air_cond +0.513, car1_s +0.361;
-    #             bike3 −0.407, surfer −0.099 — natural dips trigger but net positive)
-    #   thr=0.10: +0.0225 (bike3 still −0.389; reduced gains everywhere)
-    #   trigger_max=0.45 only: +0.0383 (truck_night lost)
-    #   dual (thr=0.04 AND trigger_max=0.50): +0.0183 (truck_night still lost)
+    # streak start. Tested alternatives and final Deltas:
+    #   thr=0.04:   +0.0511 (best — truck_night +0.476, air_cond +0.513, car1_s +0.361)
+    #   thr=0.10:   +0.0225 (reduced gains everywhere)
+    #   trigger_max=0.45: +0.0383 (truck_night lost)
+    #   dual gate:  +0.0183 (truck_night still lost)
+    #   streak-mean < 0.48: −0.0186 (truck_night never accumulates 8 consecutive)
     # thr=0.04 is the committed winner.
     REFRESH_DECLINE_THR = float(fp.get("refresh_decline_thr", 0.04))
 
@@ -263,11 +263,9 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                     _moderate_conf_streak = 0
                 elif kf_mode == "ai_lead" and REFRESH_PATIENCE > 0:
                     # Faz D — Proactive refresh with declining-confidence gate.
-                    # init() fires only when conf has declined ≥ REFRESH_DECLINE_THR
-                    # from the start of the current streak window.  Threshold=0.04
-                    # catches genuine template drift (truck_night −0.12 per window,
-                    # car1_s/air_cond larger) while being tested against 0.10.
-                    # Best result at thr=0.04: Delta=+0.0511.
+                    # init() fires only when conf declined ≥ REFRESH_DECLINE_THR
+                    # from streak start over REFRESH_PATIENCE consecutive accepted
+                    # frames. Best result at thr=0.04: Delta=+0.0511.
                     if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
                         if _moderate_conf_streak == 0:
                             _streak_start_conf = conf

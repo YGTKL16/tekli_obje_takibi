@@ -88,4 +88,6 @@ ai:
   conf_refresh_low:   0.35
   conf_refresh_high:  0.65
   refresh_patience:   8
-  refresh_decline_thr: 0.04  # committed winner
+  # Decline gate (start vs end): thr=0.04 → Delta=+0.0511 (committed winner)
+  # Streak-mean < 0.48: Delta=−0.0186 (truck_night never accumulates 8-consecutive)
+  refresh_decline_thr: 0.04
