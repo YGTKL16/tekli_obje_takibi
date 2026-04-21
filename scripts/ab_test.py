@@ -159,6 +159,11 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
     #   streak-mean < 0.48: −0.0186 (truck_night never accumulates 8 consecutive)
     # thr=0.04 is the committed winner.
     REFRESH_DECLINE_THR = float(fp.get("refresh_decline_thr", 0.04))
+    # Bbox-area gate: only refresh when predicted bbox area ≥ threshold.
+    # Blocks refreshes on small fast targets (e.g. bike: area≈164–230 px²)
+    # while allowing them on large targets (e.g. truck: area≈2000–3000 px²).
+    # 0 = disabled (backward-compatible default).
+    REFRESH_MIN_AREA = float(fp.get("refresh_min_bbox_area", 0.0))
 
     while True:
         ret, frame_bgr = cap.read()
@@ -272,7 +277,11 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                         _moderate_conf_streak += 1
                         if (_moderate_conf_streak >= REFRESH_PATIENCE and
                                 conf < _streak_start_conf - REFRESH_DECLINE_THR):
-                            tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                            _bboxarea = float(predicted_state[2]) * float(predicted_state[3])
+                            if REFRESH_MIN_AREA > 0 and _bboxarea < REFRESH_MIN_AREA:
+                                pass  # area gate: skip refresh for small targets
+                            else:
+                                tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
                             _moderate_conf_streak = 0
                     else:
                         _moderate_conf_streak = 0
@@ -343,6 +352,8 @@ def main():
     parser.add_argument("--refresh-patience", type=int, default=None,
                         help="Proactive template refresh patience (Faz D). "
                              "0 = disabled, N = refresh after N consecutive moderate-conf frames.")
+    parser.add_argument("--seq", default=None,
+                        help="Run only this sequence ID (e.g. dataset5/bike3). Overrides --all.")
     args = parser.parse_args()
     tags = [f"Mode: {args.mode}"]
     if args.gmc:
@@ -369,7 +380,9 @@ def main():
     manifest = load_manifest()
     tracker = TRTTrackWrapper()
 
-    if args.all:
+    if args.seq:
+        seq_ids = [args.seq]
+    elif args.all:
         seq_ids = sorted(manifest["train"].keys())
     else:
         seq_ids = SUBSET

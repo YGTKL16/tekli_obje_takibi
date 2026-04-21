@@ -64,6 +64,10 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     "conf_refresh_high": 0.65,
     "refresh_patience": 0,
     "refresh_decline_thr": 0.04,
+    # Min predicted-bbox area (w*h px²) required to fire a refresh.
+    # 0 = disabled. Blocks refreshes on small targets (e.g. bike: ~164 px²)
+    # while keeping them for large targets (e.g. truck: ~2000 px²).
+    "refresh_min_bbox_area": 0.0,
 }
 
 
@@ -335,6 +339,10 @@ def normalize_runtime_config(
     refresh_decline_thr = ai.get("refresh_decline_thr")
     if refresh_decline_thr is not None:
         params["refresh_decline_thr"] = float(refresh_decline_thr)
+
+    refresh_min_bbox_area = ai.get("refresh_min_bbox_area")
+    if refresh_min_bbox_area is not None:
+        params["refresh_min_bbox_area"] = float(refresh_min_bbox_area)
 
     # IMM physics params — extracted from nested imm: block in imm_tuned.yaml.
     imm_block = _as_mapping(cfg.get("imm"))

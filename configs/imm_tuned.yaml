@@ -91,3 +91,8 @@ ai:
   # Decline gate (start vs end): thr=0.04 → Delta=+0.0511 (committed winner)
   # Streak-mean < 0.48: Delta=−0.0186 (truck_night never accumulates 8-consecutive)
   refresh_decline_thr: 0.04
+  # Bbox-area gate: INVESTIGATED (E2), REJECTED — bike3 KF bbox inflates over
+  # time (164 → 3421+ px²) so no fixed threshold permanently blocks the cascade.
+  # air_cond beneficial triggers overlap with bike3 harmful triggers at area
+  # 200–300 px². No clean separation exists. Set to 0 (disabled).
+  refresh_min_bbox_area: 0.0
