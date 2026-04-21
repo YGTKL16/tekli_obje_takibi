@@ -1,0 +1,1351 @@
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:12 (find_program)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_UNAME"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "uname"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+      - "/bin/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/uname"
+      - "/home/ykula/.local/bin/uname"
+      - "/home/ykula/bin/uname"
+      - "/home/ykula/.nix-profile/bin/uname"
+      - "/nix/var/nix/profiles/default/bin/uname"
+      - "/usr/local/bin/uname"
+      - "/usr/local/sbin/uname"
+    found: "/usr/bin/uname"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:212 (message)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      The system is: Linux - 6.12.0-124.49.1.el10_1.x86_64 - x86_64
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompiler.cmake:54 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:89 (_cmake_find_compiler)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_Fortran_COMPILER"
+    description: "Fortran compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "gfortran"
+      - "f95"
+      - "ftn"
+      - "ifx"
+      - "ifort"
+      - "nvfortran"
+      - "pgfortran"
+      - "lf95"
+      - "xlf"
+      - "fort"
+      - "flang"
+      - "lfortran"
+      - "frt"
+      - "nagfor"
+    candidate_directories:
+      - "/usr/bin/"
+    searched_directories:
+      - "/usr/bin/gfortran"
+      - "/usr/bin/f95"
+      - "/usr/bin/ftn"
+      - "/usr/bin/ifx"
+      - "/usr/bin/ifort"
+      - "/usr/bin/nvfortran"
+      - "/usr/bin/pgfortran"
+      - "/usr/bin/lf95"
+      - "/usr/bin/xlf"
+      - "/usr/bin/fort"
+      - "/usr/bin/flang"
+      - "/usr/bin/lfortran"
+      - "/usr/bin/frt"
+      - "/usr/bin/nagfor"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -v 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -v;-c 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -c 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -fpp 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: --cpp-infer 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -v 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -v;-c 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -c 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: -fpp 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeFortranCompilerId.F.in"
+    candidate_directories:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/"
+      - "/home/ykula/tracker/third_party/eigen-3.4.0/cmake/"
+    found: "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFortranCompilerId.F.in"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:190 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:13 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" failed.
+      Compiler: CMAKE_Fortran_COMPILER-NOTFOUND 
+      Build flags: 
+      Id flags: --cpp-infer 
+      
+      The output was:
+      no such file or directory
+      
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_AR"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ar"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/ar"
+      - "/home/ykula/.local/bin/ar"
+      - "/home/ykula/bin/ar"
+      - "/home/ykula/.nix-profile/bin/ar"
+      - "/nix/var/nix/profiles/default/bin/ar"
+      - "/usr/local/bin/ar"
+      - "/usr/local/sbin/ar"
+    found: "/usr/bin/ar"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_RANLIB"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ranlib"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/ranlib"
+      - "/home/ykula/.local/bin/ranlib"
+      - "/home/ykula/bin/ranlib"
+      - "/home/ykula/.nix-profile/bin/ranlib"
+      - "/nix/var/nix/profiles/default/bin/ranlib"
+      - "/usr/local/bin/ranlib"
+      - "/usr/local/sbin/ranlib"
+    found: "/usr/bin/ranlib"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_STRIP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "strip"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/strip"
+      - "/home/ykula/.local/bin/strip"
+      - "/home/ykula/bin/strip"
+      - "/home/ykula/.nix-profile/bin/strip"
+      - "/nix/var/nix/profiles/default/bin/strip"
+      - "/usr/local/bin/strip"
+      - "/usr/local/sbin/strip"
+    found: "/usr/bin/strip"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_LINKER"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "ld"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/ld"
+      - "/home/ykula/.local/bin/ld"
+      - "/home/ykula/bin/ld"
+      - "/home/ykula/.nix-profile/bin/ld"
+      - "/nix/var/nix/profiles/default/bin/ld"
+      - "/usr/local/bin/ld"
+      - "/usr/local/sbin/ld"
+    found: "/usr/bin/ld"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_NM"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "nm"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/nm"
+      - "/home/ykula/.local/bin/nm"
+      - "/home/ykula/bin/nm"
+      - "/home/ykula/.nix-profile/bin/nm"
+      - "/nix/var/nix/profiles/default/bin/nm"
+      - "/usr/local/bin/nm"
+      - "/usr/local/sbin/nm"
+    found: "/usr/bin/nm"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJDUMP"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objdump"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/objdump"
+      - "/home/ykula/.local/bin/objdump"
+      - "/home/ykula/bin/objdump"
+      - "/home/ykula/.nix-profile/bin/objdump"
+      - "/nix/var/nix/profiles/default/bin/objdump"
+      - "/usr/local/bin/objdump"
+      - "/usr/local/sbin/objdump"
+    found: "/usr/bin/objdump"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_OBJCOPY"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "objcopy"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/objcopy"
+      - "/home/ykula/.local/bin/objcopy"
+      - "/home/ykula/bin/objcopy"
+      - "/home/ykula/.nix-profile/bin/objcopy"
+      - "/nix/var/nix/profiles/default/bin/objcopy"
+      - "/usr/local/bin/objcopy"
+      - "/usr/local/sbin/objcopy"
+    found: "/usr/bin/objcopy"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_READELF"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "readelf"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/readelf"
+      - "/home/ykula/.local/bin/readelf"
+      - "/home/ykula/bin/readelf"
+      - "/home/ykula/.nix-profile/bin/readelf"
+      - "/nix/var/nix/profiles/default/bin/readelf"
+      - "/usr/local/bin/readelf"
+      - "/usr/local/sbin/readelf"
+    found: "/usr/bin/readelf"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_DLLTOOL"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "dlltool"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/dlltool"
+      - "/home/ykula/.local/bin/dlltool"
+      - "/home/ykula/bin/dlltool"
+      - "/home/ykula/.nix-profile/bin/dlltool"
+      - "/nix/var/nix/profiles/default/bin/dlltool"
+      - "/usr/local/bin/dlltool"
+      - "/usr/local/sbin/dlltool"
+      - "/usr/bin/dlltool"
+      - "/usr/sbin/dlltool"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/dlltool"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_ADDR2LINE"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "addr2line"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/addr2line"
+      - "/home/ykula/.local/bin/addr2line"
+      - "/home/ykula/bin/addr2line"
+      - "/home/ykula/.nix-profile/bin/addr2line"
+      - "/nix/var/nix/profiles/default/bin/addr2line"
+      - "/usr/local/bin/addr2line"
+      - "/usr/local/sbin/addr2line"
+    found: "/usr/bin/addr2line"
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "/home/ykula/.local/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/CMakeDetermineFortranCompiler.cmake:313 (include)"
+      - "CMakeLists.txt:13 (project)"
+    mode: "program"
+    variable: "CMAKE_TAPI"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "tapi"
+    candidate_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/"
+      - "/home/ykula/.local/bin/"
+      - "/home/ykula/bin/"
+      - "/home/ykula/.nix-profile/bin/"
+      - "/nix/var/nix/profiles/default/bin/"
+      - "/usr/local/bin/"
+      - "/usr/local/sbin/"
+      - "/usr/bin/"
+      - "/usr/sbin/"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/"
+    searched_directories:
+      - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR/tapi"
+      - "/home/ykula/.local/bin/tapi"
+      - "/home/ykula/bin/tapi"
+      - "/home/ykula/.nix-profile/bin/tapi"
+      - "/nix/var/nix/profiles/default/bin/tapi"
+      - "/usr/local/bin/tapi"
+      - "/usr/local/sbin/tapi"
+      - "/usr/bin/tapi"
+      - "/usr/sbin/tapi"
+      - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64/tapi"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "/home/ykula/.codex/tmp/arg0/codex-arg0L2jEzR"
+        - "/home/ykula/.local/bin"
+        - "/home/ykula/bin"
+        - "/home/ykula/.nix-profile/bin"
+        - "/nix/var/nix/profiles/default/bin"
+        - "/usr/local/bin"
+        - "/usr/local/sbin"
+        - "/usr/bin"
+        - "/usr/sbin"
+        - "/home/ykula/.vscode/extensions/openai.chatgpt-26.325.31654-linux-x64/bin/linux-x86_64"
+...

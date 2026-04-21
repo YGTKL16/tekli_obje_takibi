@@ -1,0 +1,21 @@
+[package]
+name = "tracker_safety"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+publish = false
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[profile.release]
+codegen-units = 1
+debug = 0
+incremental = false
+lto = "thin"
+panic = "abort"
+
+[profile.do178c]
+inherits = "release"
+opt-level = 2
+strip = "debuginfo"

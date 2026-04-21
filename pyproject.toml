@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+testpaths = ["python/tracker/tests"]
+pythonpath = ["python", "build"]
+addopts = "-v --tb=short"

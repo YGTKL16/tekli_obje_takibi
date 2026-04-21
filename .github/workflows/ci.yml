@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cpp-build-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev
+
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev cppcheck clang-tidy
+
+      - name: cppcheck
+        run: |
+          cppcheck --enable=all --std=c++17 --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=checkersReport \
+            -I cpp/include cpp/src/
+
+      - name: Configure (for compile_commands.json)
+        run: cmake -B build -DBUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: clang-tidy
+        run: |
+          clang-tidy -p build \
+            --warnings-as-errors='bugprone-*,cert-*' \
+            cpp/src/*.cpp
+
+  valgrind-heap:
+    runs-on: ubuntu-24.04
+    needs: cpp-build-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev valgrind
+
+      - name: Build
+        run: |
+          cmake -B build -DBUILD_TESTS=ON
+          cmake --build build
+
+      - name: Valgrind memcheck
+        run: |
+          valgrind --tool=memcheck --error-exitcode=1 ./build/test_kalman
+          valgrind --tool=memcheck --error-exitcode=1 ./build/test_coasting
+
+  python-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-venv
+          python3 -m pip install --break-system-packages numpy pytest opencv-python-headless pyyaml
+
+      - name: Run Python tests
+        run: python3 -m pytest python/tracker/tests/ -v --tb=short
+
+  rust-bridge:
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' || contains(github.event.pull_request.changed_files, 'rust/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust tests
+        run: cd rust/tracker_safety && cargo test
+
+      - name: Rust release build
+        run: cd rust/tracker_safety && cargo build --release

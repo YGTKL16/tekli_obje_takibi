@@ -1,0 +1,10 @@
+# Optuna Faz A: 3D soft-fusion (50 trials)
+# Base: imm_tuned.yaml
+# FinalScore: base=0.6637  tuned=0.6400  delta=-0.0237
+# Kaizen: REJECT
+# Study: sf_b2_kcapped
+
+soft_fusion:
+  alpha_gate_k_conf: 2.960702   # sigmoid slope; 0=disabled
+  alpha_gate_lambda:  0.221394   # Mahalanobis suppression; 0=no effect
+  reacq_r_decay:      0.127164   # R-inflation per coast frame; 0=disabled

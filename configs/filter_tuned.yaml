@@ -1,0 +1,20 @@
+# Optuna-tuned filter/hygiene parameters
+# Best train FinalScore: 0.5923
+# Holdout FinalScore:    0.8098
+# AI-only holdout:       0.8160
+# Verdict:               FAIL
+# Trials: 200, Train: 14, Holdout: 6
+
+hygiene:
+  conf_threshold: 0.159424
+  coast_threshold: 0.087285
+  max_coast_frames: 45
+  reinit_after: 7
+  max_area_frac: 0.177804
+  max_center_jump_frac: 0.280097
+  aspect_ratio_lo: 0.189175
+  aspect_ratio_hi: 6.695691
+
+blend:
+  alpha_conf_lo: 0.224159
+  alpha_conf_hi: 0.610039

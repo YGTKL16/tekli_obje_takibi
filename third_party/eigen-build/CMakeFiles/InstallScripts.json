@@ -1,0 +1,25 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/ykula/tracker/third_party/eigen-build/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/doc/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/doc/examples/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/doc/special_examples/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/doc/snippets/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/test/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/failtest/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/blas/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/lapack/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/Eigen/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/Eigen/CXX11/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/doc/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/doc/examples/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/doc/snippets/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/unsupported/test/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/demos/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/scripts/cmake_install.cmake",
+		"/home/ykula/tracker/third_party/eigen-build/bench/spbench/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

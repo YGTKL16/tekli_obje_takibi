@@ -1,0 +1,84 @@
+# Tracker configuration
+# All tunable parameters in one place
+
+kalman:
+  # Process noise Q (diagonal)
+  process_noise:
+    position: 1.0       # x, y
+    size: 1.0            # w, h
+    velocity: 0.01       # vx, vy
+    size_velocity: 0.0001  # vw, vh
+
+  # Measurement noise R (diagonal)
+  measurement_noise:
+    position: 1.0        # x, y
+    size: 10.0           # w, h
+
+decision:
+  confidence_threshold: 0.18   # Slightly more skeptical gate before KF/state-machine trust AI
+  iou_threshold: 0.2
+  conf_bypass_threshold: 0.15  # Bypass intentionally unchanged pending a dedicated retune
+
+# Global Motion Compensation (Hafta 1.1). When enabled, each frame estimates
+# a 3×3 homography from prev→curr background; the KF state mean is warped
+# before predict(). On failure, Q is inflated instead of falling back to
+# identity (see gmc.fail_q_boost).
+gmc:
+  enabled: true
+  n_features: 200               # ORB features (was 500; 200 is sufficient for 4-DOF affine)
+  inlier_ratio_threshold: 0.3
+  min_matches: 6                 # Partial affine needs fewer matches than homography
+  foreground_dilate_factor: 1.4
+  downsample: 0.5              # 0.5 = half-resolution ORB for speed
+  fail_q_boost: 4.0            # Q multiplier when GMC fails
+
+# Adaptive measurement-noise scaling (Hafta 1.2). R_eff = R_base / max(conf, floor).
+# Floor doubles as the "poison-prevention" confidence gate.
+adaptive_r:
+  enabled: true
+  floor: 0.4
+
+# Frame-skipping (Hafta 1 — see plan §1.1). When the previous frame's SGLATrack
+# confidence exceeds skip_conf_threshold, we skip SGLATrack this frame and fall
+# back to KF-only predict. Bounded by max_consecutive_skips so an over-confident
+# prediction can't drift unchecked.
+ai:
+  skip_when_confident: false   # default OFF until proven on benchmark
+  skip_conf_threshold: 0.8
+  max_consecutive_skips: 2
+
+association:
+  enabled: true
+  top_k: 5
+  iou_threshold: 0.3
+  score_weight: 0.0
+
+coasting:
+  max_frames: 60               # After this many frames → LOST
+
+sglatrack:
+  checkpoint: "models/SGLATrack/checkpoints/sglatrack_ep0297.pth.tar"
+  config_yaml: "models/SGLATrack/experiments/sglatrack/deit_distilled.yaml"
+
+tensorrt:
+  onnx_path: "models/sglatrack.onnx"
+  engine_path: "models/sglatrack_fp16.engine"
+  fp16: true
+  # Export: python scripts/export_tensorrt.py
+  # Run:    python scripts/run_competition.py --backend tensorrt
+
+display:
+  show_window: true
+  window_name: "Tracker"
+
+# Soft fusion: α-blending + reacquisition R-inflation
+# Backward compat: all 0.0 defaults → binary behavior (no change to score)
+soft_fusion:
+  alpha_gate_k_conf: 0.0   # sigmoid slope for conf-axis; 0=disabled (binary behavior)
+  alpha_gate_lambda: 0.0   # Mahalanobis suppression weight; 0=no d² effect
+  reacq_r_decay: 0.0       # R inflation per coast frame; 0=disabled
+
+  # Fixed constants (not Optuna-tuned)
+  conf_refresh_low: 0.35   # proactive template refresh lower confidence bound
+  conf_refresh_high: 0.65  # proactive template refresh upper bound
+  refresh_patience: 4      # consecutive accepted frames before refresh fires

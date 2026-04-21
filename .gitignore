@@ -1,0 +1,51 @@
+# Build outputs
+build/
+build2/
+build_debug/
+build-verify/
+build-high-assurance*/
+*.so
+*.o
+*.a
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Models & data (large files)
+models/
+data/
+tools/ferrocene/
+
+# Outputs
+outputs/
+reports/
+rust/**/target/
+
+# Cache
+cache/
+
+# Env / tooling
+.venv/
+.venv-distrobox-empty/
+.pytest_cache/
+.claude/
+.local/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Log files
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env marker
+.tracker_env_ready

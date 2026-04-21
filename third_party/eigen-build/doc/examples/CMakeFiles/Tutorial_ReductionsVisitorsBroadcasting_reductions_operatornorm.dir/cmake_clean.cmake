@@ -1,0 +1,12 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.dir/link.d"
+  "CMakeFiles/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.dir/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.cpp.o"
+  "CMakeFiles/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.dir/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.cpp.o.d"
+  "Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm"
+  "Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/Tutorial_ReductionsVisitorsBroadcasting_reductions_operatornorm.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()
