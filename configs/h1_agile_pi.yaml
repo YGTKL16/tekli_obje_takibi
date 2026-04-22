@@ -1,0 +1,76 @@
+# H1: Agile Markov Transition Matrix Config
+# Hypothesis: pi_persist=0.96 makes IMM too "sticky" — once it locks into CV or CA model
+# during a maneuver, it stays there too long. Reducing to 0.88 gives faster model switching.
+# Change vs imm_tuned.yaml:
+#   imm.transition_matrix.pi_persist: 0.96 → 0.88
+#   This means: 12% per-frame probability of switching model (was 4%).
+#   Escape probability from any model state: 3× faster.
+# WARNING: pi_persist was Optuna-tuned on 20-seq. Override may hurt general performance.
+#   Risk: static/structure sequences (IMM most helpful category, +0.028) may regress
+#   if IMM becomes too noisy from rapid model flipping.
+# Test: python3 scripts/ab_test.py --imm --gmc --adaptive-r --imm-config configs/h1_agile_pi.yaml
+# Recommended: run AFTER H3 result. If H3 already fixes UAV, H1 may not be needed.
+# Baseline (imm_tuned.yaml): FinalScore=0.7140
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    # H1: pi_persist 0.96 → 0.88. Escape prob 4% → 12% per frame.
+    # Faster model switching; designed to help with UAV sudden maneuvers.
+    # Risk: noisier model weights on smooth sequences.
+    pi_persist: 0.88
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0

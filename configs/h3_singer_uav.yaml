@@ -1,0 +1,75 @@
+# H3: Singer UAV Agility Config
+# Hypothesis: Singer alpha=1.0 (vehicle-tuned) is too slow for quadrotor/fixed-wing UAV.
+# Literature: quadrotor α=2–5, σ²_a=100–200 (fast direction changes). [CVPR 2025, UAV tracking surveys]
+# Change vs imm_tuned.yaml:
+#   singer.alpha: 1.0 → 3.0   (τ=0.33 frames → reacts 3× faster to maneuver changes)
+#   singer.sigma2_a: 25.0 → 100.0  (std dev √100=10 vs √25=5 px/frame² → wider process noise)
+# Test: python3 scripts/ab_test.py --imm --gmc --adaptive-r --imm-config configs/h3_singer_uav.yaml
+# Expected: uav1 (-0.292) and uav3_1 (-0.123) recover; aerial category improves.
+# Risk: may hurt slow-moving targets (vehicle, person) if Singer fires too aggressively.
+# Baseline (imm_tuned.yaml): FinalScore=0.7140
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  # H3: UAV-tuned Singer. Literature: quadrotor α=2-5, σ²_a=100-200.
+  # α=3.0 → maneuver correlation time τ=1/3 frame (was τ=1 frame with α=1.0)
+  # Singer model responds 3× faster to direction changes.
+  # σ²_a=100 → std dev 10 px/frame² (was 5 px/frame²) — wider process noise
+  # allows larger velocity corrections without filter lag.
+  alpha: 3.0        # 1/τ; was 1.0 (vehicle). UAV range: 2.0–5.0.
+  sigma2_a: 100.0   # px²/frame⁴; was 25.0. UAV range: 100–200.
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0

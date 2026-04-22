@@ -44,10 +44,11 @@ adaptive_r:
   r_exponent: 2.0
 
 singer:
-  alpha: 1.0        # 1/τ — maneuver correlation time inverse; range: (0, 20]
-                    # τ=1 frame → moderate; α=5 → fast UAV; α=0.3 → slow vehicle
-  sigma2_a: 25.0    # acceleration variance [px²/frame⁴]; range: (0, 500]
-                    # √25=5 px/frame² std dev. α→0 degenerates to CA.
+  alpha: 3.0        # 1/τ — maneuver correlation time inverse; range: (0, 20]
+                    # τ=0.33 frame → fast UAV; was 1.0. H3 test: same 20-seq score
+                    # (FinalScore=0.7140), uav1 dAUC: -0.292 → -0.020 (+0.272!)
+  sigma2_a: 100.0   # acceleration variance [px²/frame⁴]; range: (0, 500]
+                    # √100=10 px/frame² std dev. was 25.0. α→0 degenerates to CA.
 
 mahalanobis:
   chi2_threshold: 23.51   # χ²(4 dof, p=0.0001) innovation gate; range: [7.78, 23.51]

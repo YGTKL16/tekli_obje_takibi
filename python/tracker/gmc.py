@@ -56,6 +56,7 @@ class GMCEstimator:
         ransac_reproj_threshold: float = 3.0,
         foreground_dilate_factor: float = 1.4,
         downsample: float = 0.5,
+        force_python: bool = False,
     ):
         if not HAS_CV2:
             raise ImportError("OpenCV required for GMCEstimator")
@@ -67,9 +68,15 @@ class GMCEstimator:
         self.foreground_dilate_factor = foreground_dilate_factor
         self.downsample = downsample
 
+        # Last-call telemetry. `last_inliers` is -1 when the C++ fast path
+        # was used (inlier count is not exported by the binding) and the
+        # actual integer count when the Python fallback ran.
+        self.last_ok: bool = False
+        self.last_inliers: int = -1
+
         # ── C++ backend ──────────────────────────────────────────
         self._cpp_gmc = None
-        if HAS_CPP_GMC:
+        if HAS_CPP_GMC and not force_python:
             self._cpp_gmc = _cpp.GMCEstimator(
                 n_features=n_features,
                 min_matches=min_matches,
@@ -98,6 +105,8 @@ class GMCEstimator:
         process noise for this step.
         """
         if prev_frame is None or curr_frame is None:
+            self.last_ok = False
+            self.last_inliers = -1
             return np.eye(3, dtype=np.float64), False
 
         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY) if prev_frame.ndim == 3 else prev_frame
@@ -111,6 +120,8 @@ class GMCEstimator:
                 np.ascontiguousarray(curr_gray),
                 fg,
             )
+            self.last_ok = bool(ok)
+            self.last_inliers = -1  # sentinel: C++ path does not expose inlier count
             return np.asarray(H_eigen, dtype=np.float64), bool(ok)
 
         # ── Python fallback ──────────────────────────────────────
@@ -156,12 +167,18 @@ class GMCEstimator:
         kp_curr, desc_curr = self._orb.detectAndCompute(curr_gray_s, mask_prev)
 
         if desc_prev is None or desc_curr is None:
+            self.last_ok = False
+            self.last_inliers = 0
             return np.eye(3, dtype=np.float64), False
         if len(kp_prev) < self.min_matches or len(kp_curr) < self.min_matches:
+            self.last_ok = False
+            self.last_inliers = 0
             return np.eye(3, dtype=np.float64), False
 
         matches = self._matcher.match(desc_prev, desc_curr)
         if len(matches) < self.min_matches:
+            self.last_ok = False
+            self.last_inliers = 0
             return np.eye(3, dtype=np.float64), False
 
         pts_prev = np.asarray(
@@ -179,14 +196,20 @@ class GMCEstimator:
         )
 
         if affine is None or inlier_mask is None:
+            self.last_ok = False
+            self.last_inliers = 0
             return np.eye(3, dtype=np.float64), False
 
         inliers = int(inlier_mask.sum())
         if inliers < self.min_matches:
+            self.last_ok = False
+            self.last_inliers = inliers
             return np.eye(3, dtype=np.float64), False
 
         inlier_ratio = inliers / len(matches)
         if inlier_ratio < self.inlier_ratio_threshold:
+            self.last_ok = False
+            self.last_inliers = inliers
             return np.eye(3, dtype=np.float64), False
 
         # Embed 2×3 affine into 3×3
@@ -198,4 +221,6 @@ class GMCEstimator:
             H_s[0, 2] *= inv_scale
             H_s[1, 2] *= inv_scale
 
+        self.last_ok = True
+        self.last_inliers = inliers
         return H_s, True

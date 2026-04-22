@@ -43,6 +43,12 @@ class IMMPolicyStep:
     reject_streak: int
     last_good_bbox: list[float]
     innovation_norm: float = 0.0
+    # Integration-audit telemetry (populated by step_guided_imm; default values
+    # preserve backward compatibility for callers that construct the step
+    # directly in tests).
+    gate_decision: str = ""
+    mahal_d2: float = 0.0
+    alpha: float = 1.0
 
 
 def _as_bbox_list(bbox) -> list[float]:
@@ -377,11 +383,15 @@ def step_guided_imm(
             reject_streak=0,
             last_good_bbox=ai_bbox,
             innovation_norm=innovation_norm,
+            gate_decision="bypass",
+            mahal_d2=d2_raw,
+            alpha=1.0,
         )
 
     # ── Normal path: sanity + gating ─────────────────────────────
     measurement_sane = False
     mahal_confirmed = False   # True when chi² gate explicitly accepted the measurement
+    sanity_reason = "no_obs" if observation_arr is None else "ok"
     if observation_arr is not None:
         measurement_sane = bool(
             decision.is_measurement_sane(
@@ -392,6 +402,8 @@ def step_guided_imm(
                 prev_bbox=judge_bbox,
             )
         )
+        if not measurement_sane:
+            sanity_reason = "sanity"
         # Mahalanobis gate: reject physically impossible measurements
         # even when they pass geometric sanity (e.g. UAV sudden teleport).
         # BYPASS when reject_streak >= mahal_bypass_after: after N frames of
@@ -407,6 +419,8 @@ def step_guided_imm(
             )
             measurement_sane = mahal_ok
             mahal_confirmed = mahal_ok   # chi² explicitly confirmed → skip IoU below
+            if not mahal_ok:
+                sanity_reason = "mahal"
 
     should_coast = bool(decision.should_coast(confidence))
 
@@ -414,12 +428,14 @@ def step_guided_imm(
     # If the chi²-weighted innovation exceeds the gate threshold, the
     # measurement is physically implausible → force coast this frame.
     # Bypass when reject_streak >= mahal_bypass_after (same logic as above).
+    phase3_forced_coast = False
     if mahal_chi2_gate > 0.0 and observation_arr is not None and not should_coast \
             and reject_streak < mahal_bypass_after:
         P_arr = np.array(kf.get_covariance(), dtype=np.float64)
         d2 = _mahalanobis_sq(innov, P_arr, r_pos_base, r_size_base)
         if d2 > mahal_chi2_gate:
             should_coast = True
+            phase3_forced_coast = True
 
     accepted_measurement = bool(
         observation_arr is not None
@@ -437,6 +453,8 @@ def step_guided_imm(
 
     next_reject_streak = reject_streak
     next_last_good = last_good
+    alpha = 1.0
+    reinit_fired = False
 
     if accepted_measurement:
         # ── α-Soft Innovation Blending ────────────────────────────────────
@@ -479,6 +497,7 @@ def step_guided_imm(
             state = np.array(kf.get_state()).flatten()
             bbox = pred_bbox(state)
             next_reject_streak = 0
+            reinit_fired = True
         else:
             bbox = pred_bbox(state)
 
@@ -496,6 +515,26 @@ def step_guided_imm(
     if innovation_threshold > 0 and innovation_norm > innovation_threshold and next_reject_streak == 0 and is_tracking:
         kf.set_gmc_failed(True)
 
+    # ── Telemetry: classify which gate path this frame took ──────
+    if reinit_fired:
+        gate_decision = "reinit"
+    elif accepted_measurement:
+        gate_decision = "accept"
+    elif observation_arr is None:
+        gate_decision = "no_obs"
+    elif phase3_forced_coast:
+        gate_decision = "reject_mahal"
+    elif should_coast:
+        gate_decision = "coast"
+    elif not is_tracking:
+        gate_decision = "lost"
+    elif sanity_reason == "sanity":
+        gate_decision = "reject_sanity"
+    elif sanity_reason == "mahal":
+        gate_decision = "reject_mahal"
+    else:
+        gate_decision = "reject_iou"
+
     return IMMPolicyStep(
         bbox=bbox,
         state=state,
@@ -506,4 +545,7 @@ def step_guided_imm(
         reject_streak=next_reject_streak,
         last_good_bbox=next_last_good,
         innovation_norm=innovation_norm,
+        gate_decision=gate_decision,
+        mahal_d2=d2_raw,
+        alpha=alpha,
     )

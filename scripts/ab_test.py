@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """A/B test: AI-only vs AI+IMM on a subset of train sequences."""
 import argparse
+import csv
+import gzip
 import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
@@ -18,6 +20,31 @@ import numpy as np
 import cv2
 import gc
 import torch
+
+
+# ─ Integration-audit telemetry ─────────────────────────────────────
+TELEMETRY_FIELDS = [
+    "seq", "frame",
+    "ai_x", "ai_y", "ai_w", "ai_h", "ai_conf",
+    "kf_px", "kf_py", "kf_pw", "kf_ph",
+    "innov_norm", "mahal_d2", "gate_decision", "alpha",
+    "mu_cv", "mu_ca", "mu_singer",
+    "gmc_ok", "gmc_inliers", "state", "refresh",
+    "final_x", "final_y", "final_w", "final_h",
+]
+
+
+def _open_telemetry(log_dir, variant, seq_id):
+    """Open per-sequence gzipped CSV. Returns (file_handle, csv_writer) or (None, None)."""
+    if not log_dir or not variant:
+        return None, None
+    seq_slug = seq_id.replace("/", "__")
+    out_dir = os.path.join(log_dir, variant)
+    os.makedirs(out_dir, exist_ok=True)
+    fh = gzip.open(os.path.join(out_dir, f"{seq_slug}.csv.gz"), "wt", newline="")
+    writer = csv.writer(fh)
+    writer.writerow(TELEMETRY_FIELDS)
+    return fh, writer
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _FILTER_CONFIG = os.path.join(_PROJECT_ROOT, "configs", "tracker_config.yaml")
@@ -85,7 +112,8 @@ SUBSET = [
 def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline",
                  gmc_enabled=False, adaptive_r_enabled=False,
                  imm_cfg=None, imm_cfg_path=None, search_scale_boost=0.0,
-                 refresh_patience=None):
+                 refresh_patience=None, f5_feedback=False,
+                 log_telemetry_path=None, variant=None):
     video_path = os.path.join(DATA_ROOT, seq_info["video_path"])
     ann_path = seq_info.get("annotation_path")
     annotations = []
@@ -121,11 +149,15 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
         )
         if gmc_enabled:
             gmc_cfg = (imm_cfg.get("gmc", {}) if imm_cfg else {}) or {}
+            # Telemetry mode uses Python fallback so inlier count is observable
+            # (C++ backend doesn't export it).
+            _force_py = bool(log_telemetry_path)
             gmc_estimator = GMCEstimator(
                 n_features=int(gmc_cfg.get("n_features", 200)),
                 inlier_ratio_threshold=float(gmc_cfg.get("inlier_ratio_threshold", 0.3)),
                 min_matches=int(gmc_cfg.get("min_matches", 6)),
                 downsample=float(gmc_cfg.get("downsample", 0.5)),
+                force_python=_force_py,
             )
             kf.set_gmc_q_boost(float(gmc_cfg.get("fail_q_boost", 4.0)))
         if adaptive_r_enabled:
@@ -164,6 +196,10 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
     # while allowing them on large targets (e.g. truck: area≈2000–3000 px²).
     # 0 = disabled (backward-compatible default).
     REFRESH_MIN_AREA = float(fp.get("refresh_min_bbox_area", 0.0))
+
+    tel_fh, tel_writer = (None, None)
+    if use_kf and log_telemetry_path is not None and variant is not None:
+        tel_fh, tel_writer = _open_telemetry(log_telemetry_path, variant, seq_id)
 
     while True:
         ret, frame_bgr = cap.read()
@@ -209,11 +245,15 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                 predicted_state = np.array(kf.predict()).flatten()
                 # Phase 4: IMM manoeuvre probability for adaptive bypass threshold
                 p_maneuver = 0.0
+                mu_cv = 0.0
+                mu_ca = 0.0
                 mu_singer = 0.0
                 if hasattr(kf, "get_model_probabilities"):
                     _mu = np.array(kf.get_model_probabilities())
-                    p_maneuver = float(_mu[1] + _mu[2])
+                    mu_cv = float(_mu[0])
+                    mu_ca = float(_mu[1])
                     mu_singer = float(_mu[2])
+                    p_maneuver = mu_ca + mu_singer
                 observation = observe_with_guidance(
                     tracker,
                     frame_rgb,
@@ -257,34 +297,68 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                 bbox = step.bbox
                 reject_streak = step.reject_streak
                 last_good_bbox = step.last_good_bbox
+                refresh_fired = False
 
                 if kf_mode in {"baseline", "coast_only", "velocity_shift"}:
                     # Final state becomes the single source of truth for the next frame.
                     tracker.set_state(bbox)
-                elif kf_mode == "ai_lead" and reject_streak >= 5 and step.should_coast:
-                    # Phase 1 — The Great Rescue: reinit AI template at KF location.
-                    # init() renews template + centre (set_state only moved centre).
-                    tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
-                    _moderate_conf_streak = 0
-                elif kf_mode == "ai_lead" and REFRESH_PATIENCE > 0:
-                    # Faz D — Proactive refresh with declining-confidence gate.
-                    # init() fires only when conf declined ≥ REFRESH_DECLINE_THR
-                    # from streak start over REFRESH_PATIENCE consecutive accepted
-                    # frames. Best result at thr=0.04: Delta=+0.0511.
-                    if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
-                        if _moderate_conf_streak == 0:
-                            _streak_start_conf = conf
-                        _moderate_conf_streak += 1
-                        if (_moderate_conf_streak >= REFRESH_PATIENCE and
-                                conf < _streak_start_conf - REFRESH_DECLINE_THR):
-                            _bboxarea = float(predicted_state[2]) * float(predicted_state[3])
-                            if REFRESH_MIN_AREA > 0 and _bboxarea < REFRESH_MIN_AREA:
-                                pass  # area gate: skip refresh for small targets
-                            else:
-                                tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
-                            _moderate_conf_streak = 0
-                    else:
+                elif kf_mode == "ai_lead":
+                    if reject_streak >= 5 and step.should_coast:
+                        # Phase 1 — The Great Rescue: reinit AI template at KF location.
+                        # init() renews template + centre (set_state only moved centre).
+                        tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
                         _moderate_conf_streak = 0
+                        refresh_fired = True
+                    else:
+                        if REFRESH_PATIENCE > 0:
+                            # Faz D — Proactive refresh with declining-confidence gate.
+                            # init() fires only when conf declined ≥ REFRESH_DECLINE_THR
+                            # from streak start over REFRESH_PATIENCE consecutive accepted
+                            # frames. Best result at thr=0.04: Delta=+0.0511.
+                            if step.accepted_measurement and CONF_REFRESH_LOW <= conf <= CONF_REFRESH_HIGH:
+                                if _moderate_conf_streak == 0:
+                                    _streak_start_conf = conf
+                                _moderate_conf_streak += 1
+                                if (_moderate_conf_streak >= REFRESH_PATIENCE and
+                                        conf < _streak_start_conf - REFRESH_DECLINE_THR):
+                                    _bboxarea = float(predicted_state[2]) * float(predicted_state[3])
+                                    if REFRESH_MIN_AREA > 0 and _bboxarea < REFRESH_MIN_AREA:
+                                        pass  # area gate: skip refresh for small targets
+                                    else:
+                                        tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                                        refresh_fired = True
+                                    _moderate_conf_streak = 0
+                            else:
+                                _moderate_conf_streak = 0
+                        # F5: closed-loop feedback — feed KF-fused bbox back to AI
+                        # search window every frame so AI always tracks from the
+                        # correct position, not its own stale internal state.
+                        # Gated behind --f5-feedback to allow clean A/B against the
+                        # prior prod behaviour (no per-frame set_state).
+                        if f5_feedback:
+                            tracker.set_state(np.array(bbox, dtype=np.float32))
+
+                if tel_writer is not None:
+                    ai_obs = observation.bbox
+                    ai_row = ([float(ai_obs[0]), float(ai_obs[1]),
+                               float(ai_obs[2]), float(ai_obs[3])]
+                              if ai_obs is not None else [float("nan")] * 4)
+                    pred4 = [float(predicted_state[0]), float(predicted_state[1]),
+                             float(predicted_state[2]), float(predicted_state[3])]
+                    gmc_ok = int(gmc_estimator.last_ok) if gmc_estimator is not None else -1
+                    gmc_inl = int(gmc_estimator.last_inliers) if gmc_estimator is not None else -1
+                    state_name = str(track_state).split(".")[-1]
+                    tel_writer.writerow([
+                        seq_id, frame_idx,
+                        *ai_row, float(conf),
+                        *pred4,
+                        float(step.innovation_norm), float(step.mahal_d2),
+                        step.gate_decision, float(step.alpha),
+                        mu_cv, mu_ca, mu_singer,
+                        gmc_ok, gmc_inl, state_name, int(refresh_fired),
+                        float(bbox[0]), float(bbox[1]),
+                        float(bbox[2]), float(bbox[3]),
+                    ])
             else:
                 ai_bbox, conf = tracker.track(frame_rgb)
                 bbox = ai_bbox.tolist() if isinstance(ai_bbox, np.ndarray) else list(ai_bbox)
@@ -298,6 +372,8 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
         frame_idx += 1
 
     cap.release()
+    if tel_fh is not None:
+        tel_fh.close()
     # Agresif bellek temizliği — her sekans sonrası
     del prev_frame_gray
     gc.collect()
@@ -354,6 +430,13 @@ def main():
                              "0 = disabled, N = refresh after N consecutive moderate-conf frames.")
     parser.add_argument("--seq", default=None,
                         help="Run only this sequence ID (e.g. dataset5/bike3). Overrides --all.")
+    parser.add_argument("--f5-feedback", action="store_true",
+                        help="Enable F5 closed-loop feedback (tracker.set_state every frame "
+                             "in ai_lead mode). Default OFF matches pre-F5 prod behaviour.")
+    parser.add_argument("--log-telemetry", default=None,
+                        help="Write per-frame integration telemetry CSV.gz into DIR/<variant>/<seq>.csv.gz.")
+    parser.add_argument("--variant", default=None,
+                        help="Variant tag for telemetry output subdir (e.g. V1, V2, V3).")
     args = parser.parse_args()
     tags = [f"Mode: {args.mode}"]
     if args.gmc:
@@ -408,7 +491,10 @@ def main():
                                   adaptive_r_enabled=args.adaptive_r,
                                   imm_cfg=imm_cfg, imm_cfg_path=args.imm_config,
                                   search_scale_boost=search_scale_boost,
-                                  refresh_patience=refresh_patience)
+                                  refresh_patience=refresh_patience,
+                                  f5_feedback=args.f5_feedback,
+                                  log_telemetry_path=args.log_telemetry,
+                                  variant=args.variant)
         auc_i, np_i = evaluate(gt, preds_imm)
         del preds_imm, gt
 

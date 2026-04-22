@@ -104,7 +104,7 @@ def _apply_imm_config(kf, cfg):
 
 def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                             use_kf=True, runtime_params=None,
-                            imm_config=None, verbose=True):
+                            imm_config=None, verbose=True, f5_feedback=False):
     """Run tracker on a single sequence, store results in dict."""
     video_path = os.path.join(DATA_ROOT, seq_info["video_path"])
     n_frames = seq_info["n_frames"]
@@ -268,6 +268,11 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                     if reject_streak >= 5 and step.should_coast:
                         # Phase 1 — The Great Rescue: reinit AI template at KF location.
                         tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                    elif f5_feedback:
+                        # F5: closed-loop feedback — feed KF-fused bbox back to AI
+                        # search window every frame. Gated behind --f5-feedback for
+                        # clean A/B against the prior prod behaviour (no set_state).
+                        tracker.set_state(np.array(bbox, dtype=np.float32))
                 else:
                     predicted_state = np.array(kf.predict()).flatten()
                     # Phase 4: IMM manoeuvre probability for adaptive bypass threshold
@@ -313,6 +318,11 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                     if reject_streak >= 5 and step.should_coast:
                         # Phase 1 — The Great Rescue: reinit AI template at KF location.
                         tracker.init(frame_rgb, np.array(bbox, dtype=np.float32))
+                    elif f5_feedback:
+                        # F5: closed-loop feedback — feed KF-fused bbox back to AI
+                        # search window every frame. Gated behind --f5-feedback for
+                        # clean A/B against the prior prod behaviour (no set_state).
+                        tracker.set_state(np.array(bbox, dtype=np.float32))
             else:
                 ai_bbox, conf = tracker.track(frame_rgb)
                 ai_bbox = ai_bbox.tolist() if isinstance(ai_bbox, np.ndarray) else list(ai_bbox)
@@ -366,6 +376,9 @@ def main():
                         help="Path to runtime/IMM config YAML")
     parser.add_argument("--no-association", action="store_true",
                         help="Disable association (use simple track() + KF  path)")
+    parser.add_argument("--f5-feedback", action="store_true",
+                        help="Enable F5 closed-loop feedback (tracker.set_state every frame). "
+                             "Default OFF matches pre-F5 prod behaviour.")
     args = parser.parse_args()
 
     # Default output path
@@ -414,7 +427,8 @@ def main():
         run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                                 use_kf=not args.no_kf,
                                 runtime_params=runtime_params,
-                                imm_config=imm_config)
+                                imm_config=imm_config,
+                                f5_feedback=args.f5_feedback)
 
     total_time = time.time() - total_start
     total_frames = sum(s["n_frames"] for s in sequences.values())

@@ -1,0 +1,69 @@
+# G1A: No-Refresh Forensics Config
+# Hypothesis: proactive template refresh (Faz D) is the primary cause of bike3/surfer cascade.
+# Change vs imm_tuned.yaml: refresh_patience: 8 → 0 (refresh completely disabled)
+# Test: python3 scripts/ab_test.py --imm --gmc --adaptive-r --imm-config configs/g1a_no_refresh.yaml
+# Expected: bike3 AUC_imm improves significantly → root cause confirmed.
+# Baseline (imm_tuned.yaml): FinalScore=0.7140, bike3 dAUC=-0.429, surfer dAUC=-0.104
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  # G1A: DISABLED — refresh_patience=0 completely turns off proactive template refresh.
+  # If bike3/surfer recover, the cascade (refresh→wrong template→conf stays low→drift)
+  # is confirmed as primary failure mode.
+  refresh_patience:   0
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0
