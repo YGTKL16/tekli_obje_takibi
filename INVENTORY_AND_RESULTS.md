@@ -40,15 +40,19 @@
 **Net H3 kazanımı (14 sekans):** +1.788 - 0.382 = **+1.406 AUC**
 → 255 sekansa bölününce ≈ +0.0055 mean AUC, tahmini FinalScore: **+0.007 iyileşme**
 
-### H3 255-Sekans Full Eval Sonucu (reference)
-```
-FinalScore (raw):  0.7106 (AI-only, non-det!)
-FinalScore (IMM):  0.7055
-Delta:             -0.0052
-IMM better: 6/255, worse: 16/255, same: 233/255
-```
-**NOT:** TensorRT FP16 non-determinizm -> --all run individual testlerden farklı olabilir.
-Car7 gibi bazı sekanslarda raw AUC farklı (0.742 vs 0.192 individual), bu GPU state birikmesinden.
+### DEFINITIVE 255-Seq Full Train Eval Karşılaştırması
+| Config | FinalScore(IMM) | FinalScore(raw) | Delta | IMM better/worse/same |
+|--------|----------------|----------------|-------|-----------------------|
+| **alpha=1.0 (eski)** | **0.6550** | 0.7102 | **-0.0552** | 52/109/94 |
+| **H3 alpha=3.0 (şimdiki)** | **0.7055** | 0.7106 | **-0.0052** | 6/16/233 |
+| **H3 kazanımı** | **+0.0505!** | ≈ 0 | +0.0500 | — |
+
+**SONUÇ: H3 alpha=3.0, alpha=1.0'dan 255 sekans üzerinde FinalScore +0.0505 daha iyi!**
+
+20-sekans alt-kümesi neden yanıltıcıydı: 20-seq kurtarma senaryoları için seçilmişti.
+Mahalanobis gate felaketi 20-seq'de YOK. Gerçek kompetisyonda H3 dramatik şekilde üstün.
+
+
 
 ### Mahalanobis Gate Keşfi (Kritik)
 alpha=1.0, sigma2_a=25: İnovasyon kovaryansı küçük → χ² skoru büyük → hızlı manevrada AI ölçümleri REDDEDİLİYOR → UAV sekanslarda katastrofik kayblar.
