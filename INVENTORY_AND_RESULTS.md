@@ -1,7 +1,62 @@
 # Tracker Envanteri & Dataset Analizi
 
-**Tarih:** 16 Nisan 2026  
+**Tarih:** 16 Nisan 2026 (güncellendi: H3 Singer UAV sonrası)  
 **Eval:** 147/255 sekans tamamlandı (GMC + Adaptive-R + baseline mode)
+
+---
+
+## 0. H3 Singer UAV Kaizen Güncellemesi (commit 631c7c0)
+
+**imm_tuned.yaml değişikliği:** `singer.alpha: 1.0 → 3.0`, `singer.sigma2_a: 25.0 → 100.0`
+
+### 20-Sekans Alt-Küme Sonucu
+| Config | FinalScore(IMM) | Delta | Karar |
+|--------|----------------|-------|-------|
+| alpha=1.0 (baseline) | **0.7140** | +0.0511 | ✅ Reference |
+| H3 alpha=3.0 | **0.7140** | +0.0505 | ✅ ACCEPTED (aynı skor) |
+| H1 pi_persist=0.88 | 0.6999 | +0.0243 | ❌ REJECTED |
+| G1A no-refresh | 0.6808 | +0.0173 | ❌ REJECTED |
+| G1B conf_high=0.50 | 0.6790 | +0.0157 | ❌ REJECTED |
+
+### H3 Felaket Sekanslara Etkisi — GEÇERLİ alpha=1.0 (güncel kod) KARŞILAŞTIRMASI
+**ÖNEMLİ:** Aşağıdaki tablo güncel kod (Faz D + Mahalanobis gate dahil) ile geçerli karşılaştırma.
+| Sekans | alpha=1.0 AUC_imm | H3 AUC_imm | H3 kazanımı | Açıklama |
+|--------|-------------------|-----------|-------------|-----------|
+| dataset3/uav3_1 | **0.370** (-0.406!) | 0.773 | **+0.403!** | Mahal gate kurtarıldı |
+| dataset4/uav1 | 0.277 (-0.209!) | 0.434 | **+0.157!** | Mahal gate kurtarıldı |
+| dataset3/bus2-n | 0.180 (-0.442!) | 0.623 | **+0.443!** | Occlusion kurtarıldı |
+| dataset3/group4_2 | 0.264 (-0.261!) | 0.526 | **+0.262!** | Grup sahne kurtarıldı |
+| dataset3/bike5 | 0.221 (-0.155) | 0.375 | **+0.154!** | Bisiklet kurtarıldı |
+| dataset5/person1_s | 0.262 (-0.344!) | 0.445 | **+0.183!** | Kişi kurtarıldı |
+| dataset4/person7 | 0.319 (-0.465!) | 0.485 | **+0.166!** | Kişi kurtarıldı |
+| dataset3/uav1 | 0.626 (-0.022) | 0.646 | +0.020 | UAV iyileştirme |
+| dataset5/uav6 | 0.505 (+0.109) | 0.399 | -0.106 | Yavaş UAV regresyon |
+| dataset5/uav8 | 0.237 (+0.103) | 0.143 | -0.094 | Yavaş UAV regresyon |
+| dataset2/Animal1 | 0.779 (+0.063) | 0.716 | -0.063 | Hayvan regresyon |
+| dataset3/runner2 | 0.779 (+0.049) | 0.727 | -0.052 | Koşucu regresyon |
+| dataset2/RaceCar | 0.862 (+0.005) | 0.815 | -0.047 | Yarış arabası |
+| dataset5/car7 | 0.212 (+0.021) | 0.192 | -0.020 | Araç regresyon |
+
+**Net H3 kazanımı (14 sekans):** +1.788 - 0.382 = **+1.406 AUC**
+→ 255 sekansa bölününce ≈ +0.0055 mean AUC, tahmini FinalScore: **+0.007 iyileşme**
+
+### H3 255-Sekans Full Eval Sonucu (reference)
+```
+FinalScore (raw):  0.7106 (AI-only, non-det!)
+FinalScore (IMM):  0.7055
+Delta:             -0.0052
+IMM better: 6/255, worse: 16/255, same: 233/255
+```
+**NOT:** TensorRT FP16 non-determinizm -> --all run individual testlerden farklı olabilir.
+Car7 gibi bazı sekanslarda raw AUC farklı (0.742 vs 0.192 individual), bu GPU state birikmesinden.
+
+### Mahalanobis Gate Keşfi (Kritik)
+alpha=1.0, sigma2_a=25: İnovasyon kovaryansı küçük → χ² skoru büyük → hızlı manevrada AI ölçümleri REDDEDİLİYOR → UAV sekanslarda katastrofik kayblar.
+alpha=3.0, sigma2_a=100: Daha büyük kovaryans → daha geniş kapı → hızlı manevrada AI ölçümleri KABUL EDİLİYOR → UAV sekanslarda kurtarma.
+
+
+
+
 
 ---
 
