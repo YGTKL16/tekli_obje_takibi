@@ -17,6 +17,14 @@ Examples:
 
 from __future__ import annotations
 
+# ── Noise suppression (TF/CUDA/timm warnings spam) ───────────────────────────
+import os as _os
+import warnings as _warnings
+_os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+_os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+_warnings.filterwarnings("ignore")
+# ─────────────────────────────────────────────────────────────────────────────
+
 import argparse
 import copy
 import gc
