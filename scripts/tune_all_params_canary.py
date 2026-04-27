@@ -32,6 +32,7 @@ import yaml
 
 try:
     import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)  # suppress per-trial INFO dumps
 except ImportError:  # keep --help usable on minimal environments
     optuna = None  # type: ignore[assignment]
 
@@ -342,6 +343,50 @@ def write_trial_config(cfg: dict[str, Any], tmp_dir: str, trial_number: int) -> 
     return path
 
 
+class _ProgressCallback:
+    """Per-trial progress line printed to stdout after every completed trial.
+
+    Example output::
+
+        Trial   7/100 | score=+0.7231 | best=0.7231 (#7) | elapsed=14m 03s | ETA=2h 45m
+    """
+
+    def __init__(self, n_trials: int, t0: float) -> None:
+        self._n = n_trials
+        self._t0 = t0
+
+    @staticmethod
+    def _fmt(secs: float) -> str:
+        h, rem = divmod(int(max(secs, 0)), 3600)
+        m, s = divmod(rem, 60)
+        return f"{h}h {m:02d}m" if h else f"{m}m {s:02d}s"
+
+    def __call__(self, study: "optuna.Study", trial: "optuna.trial.FrozenTrial") -> None:
+        complete = [t for t in study.trials if t.state.name == "COMPLETE"]
+        done = len(complete)
+        elapsed = time.time() - self._t0
+        per_trial = elapsed / max(done, 1)
+        eta = per_trial * max(self._n - done, 0)
+
+        score = trial.value if trial.value is not None else float("nan")
+        try:
+            best_val = study.best_value
+            best_num = study.best_trial.number
+            best_str = f"{best_val:.4f} (#{best_num})"
+        except ValueError:
+            best_str = "n/a"
+
+        pct = 100.0 * done / self._n if self._n else 0.0
+        print(
+            f"\033[1mTrial {done:4d}/{self._n}\033[0m  [{pct:5.1f}%]"
+            f"  score={score:+.4f}"
+            f"  best={best_str}"
+            f"  elapsed={self._fmt(elapsed)}"
+            f"  ETA={self._fmt(eta)}",
+            flush=True,
+        )
+
+
 def make_objective(
     tracker,
     manifest: dict[str, Any],
@@ -506,7 +551,13 @@ def main() -> None:
         )
         print(f"\nStarting {args.n_trials} trials. DB: {args.study_db}")
         t0 = time.time()
-        study.optimize(objective, n_trials=args.n_trials, show_progress_bar=True)
+        progress_cb = _ProgressCallback(n_trials=args.n_trials, t0=t0)
+        study.optimize(
+            objective,
+            n_trials=args.n_trials,
+            show_progress_bar=False,  # _ProgressCallback handles progress
+            callbacks=[progress_cb],
+        )
         print(f"Elapsed: {time.time() - t0:.1f}s")
 
     if len([t for t in study.trials if t.value is not None]) == 0:
