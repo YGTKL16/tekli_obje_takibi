@@ -1,6 +1,6 @@
 # Tracker Envanteri & Dataset Analizi
 
-**Tarih:** 27 Nisan 2026 (güncellendi: D1=REJECTED; C1 255-seq yeniden eval gerekli)  
+**Tarih:** 27 Nisan 2026 (güncellendi: C1 255-seq KABUL FS=0.7215 — YENİ ALTIN STANDART)
 **Eval:** 255/255 tamamlandı (GMC + Adaptive-R + IMM + F5 + C1 startup suppression — c1 = ALTIN STANDART)
 
 ---
@@ -128,7 +128,8 @@ FinalScore(raw)=0.6797  FinalScore(IMM)=0.7131  Delta=+0.0334  IMM better:8/22 w
 **C1 255-seq Sonucu:**
 | Config | AUC | NormPrec | FinalScore | Delta vs i12 | Karar |
 |--------|-----|----------|------------|--------------|-------|
-| **c1_startup_classifier** | **0.6793** | **0.7717** | **0.7163** | **+0.0024** | ✅ YENİ ALTIN STANDART |
+| **c1_startup_classifier** | **0.6843** | **0.7774** | **0.7215** | **+0.0076** | ✅ YENİ ALTIN STANDART |
+| c1 (geçersiz — startup kodu yoktu) | 0.6793 | 0.7717 | 0.7163 | +0.0024 | GEÇERSİZ |
 | i12 + T1 + F5 (eski altın) | — | — | 0.7139 | — | önceki standart |
 
 **Yanlış pozitif riski:** Sıfır — 22-seq'de hiç yanlış pozitif yok. car8 dışında sınıflandırıcı ateşlemedi.
@@ -139,9 +140,9 @@ FinalScore(raw)=0.6797  FinalScore(IMM)=0.7131  Delta=+0.0334  IMM better:8/22 w
 
 | Config | AUC | NormPrec | FinalScore | Delta vs i12 | Karar |
 |--------|-----|----------|------------|--------------|-------|
-| **c1_startup_classifier** | **0.6793** | **0.7717** | **0.7163** | **+0.0024** | ✅ ALTIN STANDART |
+| **c1_startup_classifier** | **0.6843** | **0.7774** | **0.7215** | **+0.0076** | ✅ YENİ ALTIN STANDART |
+| n7_f5_pos_only | 0.6738 | 0.7644 | 0.7100 | −0.0039 | ❌ REJECTED (aircon −0.222) |
 | i12 + T1 + F5 (eski altın) | 0.6049 | 0.7594 | 0.7139 | — | önceki standart |
-| n7_f5_pos_only | 0.6738 | 0.7644 | 0.7100 | −0.0039 | ❌ REJECTED |
 | n5_f5_reject_gate (rw=10,rc=3) | — | — | 0.7071 | −0.0068 | ❌ REJECTED |
 | n4_f5_coast_only | — | — | ~0.7101* | ~−0.0038* | ❌ REJECTED |
 
