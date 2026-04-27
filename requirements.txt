@@ -1,0 +1,42 @@
+# Python runtime for this tracker repo.
+# Recommended Python: 3.10+
+#
+# System packages still needed for the C++/pybind tracker_cpp build:
+#   build-essential cmake pkg-config python3-dev libeigen3-dev libopencv-dev
+#
+# CUDA/TensorRT note:
+#   For H100, prefer an NVIDIA/NGC or CUDA-ready image with torch + TensorRT
+#   already matched to the driver. TensorRT is intentionally not pinned here;
+#   install it from the matching NVIDIA runtime when using --backend tensorrt.
+
+numpy>=1.24
+opencv-python>=4.8
+PyYAML>=6.0
+
+# SGLATrack / PyTorch backend
+torch>=2.1
+torchvision>=0.16
+timm>=0.9.12
+easydict>=1.13
+
+# Tuning / experiments
+optuna>=3.6
+tqdm>=4.66
+gdown>=5.1
+
+# ONNX export helper
+onnx>=1.16
+
+# C++ binding build
+pybind11[global]>=2.11
+
+# Tests and notebooks
+pytest>=8.0
+ipykernel>=6.29
+notebook>=7.0
+
+# Optional, install manually only when needed:
+# tensorrt
+# pycuda
+# onnxruntime-gpu
+# wandb
