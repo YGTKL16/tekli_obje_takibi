@@ -7,6 +7,31 @@ import numpy as np
 import pytest
 
 
+def test_processing_utils_loader_skips_sglatrack_data_package_init(tmp_path, monkeypatch):
+    import sys
+    from tracker import sglatrack_wrapper as module
+
+    data_dir = tmp_path / "lib" / "train" / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "__init__.py").write_text("raise RuntimeError('package init should not run')\n")
+    (data_dir / "processing_utils.py").write_text(
+        "def sample_target():\n"
+        "    return 'sample'\n"
+        "\n"
+        "def transform_image_to_crop():\n"
+        "    return 'transform'\n"
+    )
+
+    sys.modules.pop("_sglatrack_processing_utils", None)
+    monkeypatch.setattr(module, "_SGLA_ROOT", str(tmp_path))
+
+    sample_target, transform_image_to_crop = module._load_processing_utils()
+
+    assert sample_target() == "sample"
+    assert transform_image_to_crop() == "transform"
+    sys.modules.pop("_sglatrack_processing_utils", None)
+
+
 class _FakeTensor:
     def __init__(self, array):
         self.array = np.asarray(array)

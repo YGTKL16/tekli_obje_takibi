@@ -40,3 +40,4 @@ notebook>=7.0
 # pycuda
 # onnxruntime-gpu
 # wandb
+# jpeg4py  # only for upstream SGLATrack training/data-loader scripts

@@ -1,5 +1,6 @@
 import os
 import sys
+import importlib.util
 
 import numpy as np
 
@@ -9,6 +10,32 @@ _SGLA_ROOT = os.path.join(_PROJECT_ROOT, "models", "SGLATrack")
 DEFAULT_CHECKPOINT_PATH = os.path.join(
     _PROJECT_ROOT, "models", "SGLATrack", "checkpoints", "sglatrack_ep0297.pth.tar"
 )
+
+
+def _load_processing_utils():
+    """Load SGLATrack crop helpers without importing lib.train.data.__init__.
+
+    The upstream package-level import pulls in jpeg4py for training data
+    loading. Inference only needs processing_utils.py, so loading the file
+    directly avoids making jpeg4py a hard runtime dependency.
+    """
+    module_name = "_sglatrack_processing_utils"
+    cached = sys.modules.get(module_name)
+    if cached is not None:
+        return cached.sample_target, cached.transform_image_to_crop
+
+    module_path = os.path.join(_SGLA_ROOT, "lib", "train", "data", "processing_utils.py")
+    if not os.path.exists(module_path):
+        raise FileNotFoundError(f"SGLATrack processing_utils.py not found: {module_path}")
+
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load SGLATrack processing utils from {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module.sample_target, module.transform_image_to_crop
 
 
 class SGLATrackWrapper:
@@ -38,6 +65,7 @@ class SGLATrackWrapper:
         self._cfg = None
         self._torch = None
         self._sample_target = None
+        self._transform_image_to_crop = None
         self._clip_box = None
         self._state = None
         self._z_dict = None
@@ -60,6 +88,14 @@ class SGLATrackWrapper:
         """Load SGLATrack model (deferred until first use)."""
         import torch
 
+        if not os.path.isfile(self.checkpoint_path):
+            raise FileNotFoundError(
+                "SGLATrack checkpoint not found: "
+                f"{self.checkpoint_path}. Download sglatrack_ep0297.pth.tar "
+                "from the authors' Google Drive and place it under "
+                "models/SGLATrack/checkpoints/."
+            )
+
         # Add SGLATrack to path
         if _SGLA_ROOT not in sys.path:
             sys.path.insert(0, _SGLA_ROOT)
@@ -67,12 +103,13 @@ class SGLATrackWrapper:
         from lib.config.sglatrack.config import cfg, update_config_from_file  # pyright: ignore[reportMissingImports]
         from lib.models.sglatrack import build_sglatrack  # pyright: ignore[reportMissingImports]
         from lib.test.tracker.data_utils import Preprocessor  # pyright: ignore[reportMissingImports]
-        from lib.train.data.processing_utils import sample_target  # pyright: ignore[reportMissingImports]
         from lib.test.utils.hann import hann2d  # pyright: ignore[reportMissingImports]
         from lib.utils.box_ops import clip_box  # pyright: ignore[reportMissingImports]
 
         # Store imports for later use
+        sample_target, transform_image_to_crop = _load_processing_utils()
         self._sample_target = sample_target
+        self._transform_image_to_crop = transform_image_to_crop
         self._clip_box = clip_box
         self._torch = torch
 
@@ -133,11 +170,10 @@ class SGLATrackWrapper:
         self._box_mask_z = None
         if self._use_ce:
             from lib.utils.ce_utils import generate_mask_cond  # pyright: ignore[reportMissingImports]
-            from lib.train.data.processing_utils import transform_image_to_crop  # pyright: ignore[reportMissingImports]
 
             crop_sz = self._torch.Tensor([self.template_size, self.template_size])
             bbox_tensor = self._torch.tensor(self._state)
-            template_bbox = transform_image_to_crop(
+            template_bbox = self._transform_image_to_crop(
                 bbox_tensor, bbox_tensor, resize_factor, crop_sz, normalize=True
             )
             template_bbox = template_bbox.view(1, 1, 4).to(self._device)
