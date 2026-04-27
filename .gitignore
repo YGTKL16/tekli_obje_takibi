@@ -22,7 +22,13 @@ tools/ferrocene/
 # Outputs
 outputs/
 reports/
+output_viz/
+runs/*/videos/
 rust/**/target/
+nohup.out
+
+# Local dataset / external experiment dumps
+MISIR PROJESİ/
 
 # Cache
 cache/

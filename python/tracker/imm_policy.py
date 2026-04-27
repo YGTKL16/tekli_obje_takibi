@@ -49,6 +49,8 @@ class IMMPolicyStep:
     gate_decision: str = ""
     mahal_d2: float = 0.0
     alpha: float = 1.0
+    # D1: Maneuver Detector — True when dynamic pi was injected this frame.
+    maneuver_fired: bool = False
 
 
 def _as_bbox_list(bbox) -> list[float]:
@@ -114,6 +116,21 @@ def _compute_update_alpha(
         alpha = max(alpha, singer_prob)
 
     return float(min(max(alpha, 0.0), 1.0))
+
+
+def clamp_coast_velocity(predicted_state, max_speed: float) -> np.ndarray:
+    """D2B: Return a copy of predicted_state with velocity clamped to max_speed px/frame.
+
+    Only translational velocity (vx, vy) is clamped; size-rate (vw, vh) and
+    acceleration components are untouched.  Clamping is per-axis (L-inf norm) to
+    keep direction. Used to prevent the search window drifting arbitrarily far
+    during coast when the KF velocity estimate grows unrealistically.
+    """
+    st = np.asarray(predicted_state, dtype=np.float32).flatten().copy()
+    if st.shape[0] > 5:
+        st[4] = float(np.clip(st[4], -max_speed, max_speed))
+        st[5] = float(np.clip(st[5], -max_speed, max_speed))
+    return st
 
 
 def choose_search_bbox(
@@ -295,6 +312,33 @@ def step_guided_imm(
     alpha_gate_k_conf: float = 0.0,
     alpha_gate_lambda: float = 0.0,
     reacq_r_decay: float = 0.0,
+    # D1: Maneuver Detector — dynamic pi injection
+    maneuver_pi_enabled: bool = False,
+    maneuver_pi_thr: float = 16.0,
+    maneuver_pi_persist: float = 0.72,
+    maneuver_pi_singer_boost: float = 0.20,
+    normal_pi_persist: float = 0.96,
+    # Velocity direction gate: reject 180° antipode detections (0 = disabled)
+    vel_gate_min_speed: float = 0.0,   # min px/frame for KF velocity to arm gate
+    vel_gate_cos_thr: float = 0.5,     # reject when cos(angle) < -thr (>120°)
+    # Dynamic bypass: adapt mahal_bypass_after based on AI confidence + KF speed.
+    # Discriminates between maneuver (high conf + fast → open gate quickly) and
+    # ID-switch risk (low conf or stable → keep gate armored longer).
+    # Set mahal_bypass_conf_thr > 0 or mahal_bypass_vel_thr > 0 to enable.
+    # When disabled (both = 0), falls back to static mahal_bypass_after.
+    mahal_bypass_conf_thr: float = 0.0,   # AI conf ≥ thr → fast bypass eligible; 0=disabled
+    mahal_bypass_vel_thr: float = 0.0,    # KF speed ≥ thr (px/frame) → fast bypass eligible; 0=disabled
+    mahal_bypass_after_fast: int = 2,     # bypass_after when conf+vel conditions both met
+    mahal_bypass_after_slow: int = 5,     # bypass_after otherwise (ID-switch protection)
+    # Velocity-relative innovation gate: blocks wrong-target ID switches when
+    # the AI observation is implausibly far from the KF prediction relative to
+    # the current KF velocity.  Ratio = center_innov_px / max(kf_speed, min_speed).
+    # High ratio (>>1) signals the AI jumped to a stationary wrong target.
+    # Set vel_innov_ratio_gate > 0 to enable; 0 = disabled (default).
+    vel_innov_ratio_gate: float = 0.0,    # force coast when ratio > this; 0=disabled
+    vel_innov_min_speed: float = 1.0,     # floor for kf_speed denominator (px/frame)
+    vel_innov_min_innov: float = 0.0,     # minimum absolute center innov (px) to fire gate; 0=no min
+    accept_bbox_raw: bool = False,        # output raw AI obs (not KF state) on accepted frames
 ) -> IMMPolicyStep:
     """Judge the observed bbox and produce the single final filter output."""
     predicted = np.asarray(predicted_state, dtype=np.float32).flatten()
@@ -302,6 +346,16 @@ def step_guided_imm(
     bbox = pred_bbox(predicted)
     judge_bbox = pred_bbox(predicted) if judge_reference_bbox is None else _as_bbox_list(judge_reference_bbox)
     last_good = bbox if last_good_bbox is None else _as_bbox_list(last_good_bbox)
+
+    # Dynamic bypass: select effective bypass_after based on scene conditions.
+    # If both conf_thr=0 and vel_thr=0, fall back to static mahal_bypass_after.
+    if mahal_bypass_conf_thr > 0.0 or mahal_bypass_vel_thr > 0.0:
+        _speed = math.sqrt(float(predicted[4]) ** 2 + float(predicted[5]) ** 2)
+        _cond_conf = confidence >= mahal_bypass_conf_thr if mahal_bypass_conf_thr > 0.0 else True
+        _cond_vel  = _speed >= mahal_bypass_vel_thr  if mahal_bypass_vel_thr  > 0.0 else True
+        _eff_bypass_after = mahal_bypass_after_fast if (_cond_conf and _cond_vel) else mahal_bypass_after_slow
+    else:
+        _eff_bypass_after = mahal_bypass_after  # static mode (backward compat)
 
     # ── Parse observation & compute innovation ───────────────────
     observation_arr = None
@@ -325,6 +379,38 @@ def step_guided_imm(
     ):
         d2_raw = float(kf.mahalanobis_sq(observation_arr))
 
+    # ── D1: Maneuver Detector — dynamic pi injection ──────────────
+    # When Mahalanobis distance indicates a sudden maneuver (d² > thr),
+    # temporarily lower pi_persist so Singer can dominate faster, then
+    # restore the normal pi after the update.
+    _maneuver_fired = False
+    _pi_was_overridden = False
+    if (
+        maneuver_pi_enabled
+        and kf is not None
+        and hasattr(kf, "set_transition_matrix")
+        and kf.is_initialized()
+        and d2_raw > maneuver_pi_thr
+        and observation_arr is not None
+    ):
+        # Build agile pi: reduced self-persistence, boosted Singer channel.
+        # off_cv_ca = share of non-Singer probability allocated to CV and CA
+        off_total = 1.0 - maneuver_pi_persist         # e.g. 0.28 when persist=0.72
+        singer_off = maneuver_pi_singer_boost          # e.g. 0.20
+        # other_off = full cross-term from CV↔CA (rows 0/1 each have one cross slot)
+        other_off = max(off_total - singer_off, 0.0)  # e.g. 0.08 → row sum: 0.72+0.08+0.20=1.00
+        agile_pi = np.array(
+            [
+                [maneuver_pi_persist, other_off, singer_off],
+                [other_off, maneuver_pi_persist, singer_off],
+                [other_off / 2.0, other_off / 2.0, 1.0 - other_off],
+            ],
+            dtype=np.float32,
+        )
+        kf.set_transition_matrix(agile_pi)
+        _pi_was_overridden = True
+        _maneuver_fired = True
+
     # ── High-confidence bypass: trust AI directly ────────────────
     # Bypass skips conf/IoU gates but STILL updates KF to keep state in sync
     # with the AI output.  Without this, the search window diverges from the
@@ -338,12 +424,12 @@ def step_guided_imm(
     # Bypass Mahalanobis guard: reject bypass when the AI measurement is
     # statistically inconsistent with the KF prediction (teleportation case).
     # Skip the guard when KF is uninitialised (d2_raw=0) or when reject_streak
-    # already reached mahal_bypass_after — at that point KF has diverged and
+    # already reached _eff_bypass_after — at that point KF has diverged and
     # blocking bypass would make the failure permanent.
     _bypass_d2_ok = (
         d2_raw < mahal_chi2_threshold
         or not (kf is not None and kf.is_initialized())
-        or reject_streak >= mahal_bypass_after
+        or reject_streak >= _eff_bypass_after
     )
     if (
         eff_bypass_thr > 0
@@ -373,6 +459,17 @@ def step_guided_imm(
             bypass_state = np.array(kf.update(observation_arr, float(eff_conf_bypass ** r_exponent))).flatten()
         else:
             bypass_state = np.array(kf.update(observation_arr)).flatten()
+        # D1: restore normal pi after bypass update
+        if _pi_was_overridden:
+            _off = (1.0 - normal_pi_persist) / 2.0
+            _normal_pi = np.array(
+                [[normal_pi_persist, _off, _off],
+                 [_off, normal_pi_persist, _off],
+                 [_off, _off, normal_pi_persist]],
+                dtype=np.float32,
+            )
+            kf.set_transition_matrix(_normal_pi)
+            _pi_was_overridden = False
         return IMMPolicyStep(
             bbox=ai_bbox,
             state=bypass_state,
@@ -386,12 +483,41 @@ def step_guided_imm(
             gate_decision="bypass",
             mahal_d2=d2_raw,
             alpha=1.0,
+            maneuver_fired=_maneuver_fired,
         )
 
     # ── Normal path: sanity + gating ─────────────────────────────
     measurement_sane = False
     mahal_confirmed = False   # True when chi² gate explicitly accepted the measurement
     sanity_reason = "no_obs" if observation_arr is None else "ok"
+
+    # ── Velocity direction gate: reject 180° ID-switch candidates ──
+    # If the observation implies a direction nearly opposite to the KF velocity,
+    # it's almost certainly a different object. Only fires when KF has meaningful
+    # velocity (> vel_gate_min_speed px/frame) and the implied displacement also
+    # has sufficient magnitude. Does NOT fire at bypass level (handled above).
+    if (
+        vel_gate_min_speed > 0.0
+        and observation_arr is not None
+        and predicted[4] ** 2 + predicted[5] ** 2 > vel_gate_min_speed ** 2
+    ):
+        pred_vx, pred_vy = float(predicted[4]), float(predicted[5])
+        pred_speed_sq = pred_vx ** 2 + pred_vy ** 2
+        obs_cx = float(observation_arr[0]) + float(observation_arr[2]) * 0.5
+        obs_cy = float(observation_arr[1]) + float(observation_arr[3]) * 0.5
+        pred_cx = float(predicted[0]) + float(predicted[2]) * 0.5
+        pred_cy = float(predicted[1]) + float(predicted[3]) * 0.5
+        disp_x, disp_y = obs_cx - pred_cx, obs_cy - pred_cy
+        disp_speed_sq = disp_x ** 2 + disp_y ** 2
+        if disp_speed_sq > vel_gate_min_speed ** 2:
+            dot = pred_vx * disp_x + pred_vy * disp_y
+            cos_angle = dot / (math.sqrt(pred_speed_sq) * math.sqrt(disp_speed_sq))
+            if cos_angle < -vel_gate_cos_thr:
+                observation_arr = None   # force coast — antipode ID switch
+                sanity_reason = "vel_gate"
+
+    if observation_arr is None:
+        sanity_reason = "no_obs"
     if observation_arr is not None:
         measurement_sane = bool(
             decision.is_measurement_sane(
@@ -406,10 +532,10 @@ def step_guided_imm(
             sanity_reason = "sanity"
         # Mahalanobis gate: reject physically impossible measurements
         # even when they pass geometric sanity (e.g. UAV sudden teleport).
-        # BYPASS when reject_streak >= mahal_bypass_after: after N frames of
+        # BYPASS when reject_streak >= _eff_bypass_after: after N frames of
         # consecutive rejection the KF prediction has likely already diverged
         # from the target — continuing to gate makes the failure permanent.
-        if measurement_sane and kf is not None and reject_streak < mahal_bypass_after:
+        if measurement_sane and kf is not None and reject_streak < _eff_bypass_after:
             mahal_ok = bool(
                 decision.is_measurement_mahalanobis_ok(
                     observation_arr,
@@ -427,15 +553,44 @@ def step_guided_imm(
     # ── Phase 3: Mahalanobis innovation gate ─────────────────────
     # If the chi²-weighted innovation exceeds the gate threshold, the
     # measurement is physically implausible → force coast this frame.
-    # Bypass when reject_streak >= mahal_bypass_after (same logic as above).
+    # Bypass when reject_streak >= _eff_bypass_after (same logic as above).
     phase3_forced_coast = False
     if mahal_chi2_gate > 0.0 and observation_arr is not None and not should_coast \
-            and reject_streak < mahal_bypass_after:
+            and reject_streak < _eff_bypass_after:
         P_arr = np.array(kf.get_covariance(), dtype=np.float64)
         d2 = _mahalanobis_sq(innov, P_arr, r_pos_base, r_size_base)
         if d2 > mahal_chi2_gate:
             should_coast = True
             phase3_forced_coast = True
+
+    # ── Phase 3b: Velocity-relative innovation gate ───────────────
+    # Blocks wrong-target ID switches when the AI observation is implausibly
+    # far from the KF prediction relative to the current KF velocity.  A
+    # stationary target (vx≈vy≈0) that suddenly appears 60+ px away is almost
+    # certainly a different object.  Fast-moving targets (large KF speed) are
+    # immune because the ratio stays small.  Only fires in the NORMAL path
+    # (non-bypass), so high-confidence re-acquisitions are not blocked.
+    vel_innov_fired = False
+    if (vel_innov_ratio_gate > 0.0
+            and observation_arr is not None
+            and not should_coast
+            and kf is not None
+            and kf.is_initialized()
+            and reject_streak < _eff_bypass_after):
+        _obs_cx = float(observation_arr[0]) + float(observation_arr[2]) * 0.5
+        _obs_cy = float(observation_arr[1]) + float(observation_arr[3]) * 0.5
+        _pred_cx = float(predicted[0]) + float(predicted[2]) * 0.5
+        _pred_cy = float(predicted[1]) + float(predicted[3]) * 0.5
+        _center_innov_px = math.sqrt(
+            (_obs_cx - _pred_cx) ** 2 + (_obs_cy - _pred_cy) ** 2
+        )
+        _kf_speed = math.sqrt(float(predicted[4]) ** 2 + float(predicted[5]) ** 2)
+        _eff_speed = max(_kf_speed, vel_innov_min_speed)
+        if _center_innov_px / _eff_speed > vel_innov_ratio_gate:
+            if vel_innov_min_innov <= 0.0 or _center_innov_px >= vel_innov_min_innov:
+                should_coast = True
+                sanity_reason = "vel_innov_gate"
+                vel_innov_fired = True
 
     accepted_measurement = bool(
         observation_arr is not None
@@ -483,7 +638,14 @@ def step_guided_imm(
             state = np.array(kf.update(z_soft, float(eff_conf ** r_exponent))).flatten()
         else:
             state = np.array(kf.update(z_soft)).flatten()
-        bbox = pred_bbox(state)
+        # accept_bbox_raw: output the raw AI observation directly instead of the
+        # Kalman-smoothed state.  KF is still updated (state used for prediction).
+        # This eliminates size-smoothing lag when the target changes apparent size
+        # rapidly (e.g. car approaching camera), without affecting coasting benefit.
+        if accept_bbox_raw and observation_arr is not None:
+            bbox = _as_bbox_list(observation_arr)
+        else:
+            bbox = pred_bbox(state)
         next_last_good = bbox
         next_reject_streak = 0
     else:
@@ -499,7 +661,22 @@ def step_guided_imm(
             next_reject_streak = 0
             reinit_fired = True
         else:
-            bbox = pred_bbox(state)
+            # AI-fallback output: when coasting (should_coast=True) or the
+            # measurement passed sanity but was rejected for another reason,
+            # prefer AI bbox over extrapolating KF prediction — supports F5
+            # closed-loop feedback so the search window follows the detection.
+            # SAFETY: do NOT use AI bbox when it was rejected by sanity/mahal
+            # gate AND we are not already coasting — that would output a
+            # physically implausible bbox (e.g. 400px teleport with conf=0.95).
+            # KF state is NOT updated — gate decision stands.
+            #
+            # vel_innov_fired exception: the observation IS the wrong target,
+            # so output the KF prediction to keep f5-feedback on the correct
+            # last-known-good location.  Do not follow the wrong object.
+            if observation_arr is not None and (should_coast or measurement_sane) and not vel_innov_fired:
+                bbox = _as_bbox_list(observation_arr)
+            else:
+                bbox = pred_bbox(state)
 
     if any(np.isnan(v) for v in bbox) or bbox[2] <= 0.0 or bbox[3] <= 0.0:
         fallback = pred_bbox(predicted)
@@ -514,6 +691,17 @@ def step_guided_imm(
     # false Q-boost after coasting or prolonged measurement rejection.
     if innovation_threshold > 0 and innovation_norm > innovation_threshold and next_reject_streak == 0 and is_tracking:
         kf.set_gmc_failed(True)
+
+    # D1: restore normal pi after all update paths
+    if _pi_was_overridden and kf is not None and hasattr(kf, "set_transition_matrix"):
+        _off = (1.0 - normal_pi_persist) / 2.0
+        _normal_pi = np.array(
+            [[normal_pi_persist, _off, _off],
+             [_off, normal_pi_persist, _off],
+             [_off, _off, normal_pi_persist]],
+            dtype=np.float32,
+        )
+        kf.set_transition_matrix(_normal_pi)
 
     # ── Telemetry: classify which gate path this frame took ──────
     if reinit_fired:
@@ -548,4 +736,5 @@ def step_guided_imm(
         gate_decision=gate_decision,
         mahal_d2=d2_raw,
         alpha=alpha,
+        maneuver_fired=_maneuver_fired,
     )

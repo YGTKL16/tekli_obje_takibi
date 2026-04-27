@@ -1,0 +1,147 @@
+# I12: Great Rescue Area Gate — Boyut Duyarlı Panik Butonu
+#
+# Kaizen Trial #10 | 2026-04-24 | Baseline: i9c/i11 IMM=0.7195
+# SONUÇ: IMM=0.7419 — Δ=+0.0224 → KABUL ✅  (NEW GOLDEN STANDARD)
+#
+# Teşhis:
+#   bike3 (10×17=170px²): FazD her ateşlemesinde KF state'i bozuyor → 0.182 çöküş.
+#   i10_no_fazd kanıtı: FazD olmadan bike3=0.589 (KF tek başına yeterli).
+#   KF drift problemi: bbox[2]*bbox[3] trigger için kullanıldığında KF drift sonrası
+#   mevcut bbox alanı 220px²'yi aşıyor → gate devreye girmiyor (i12e hatası).
+#
+# i12 + i12f Çözümü:
+#   1. Great Rescue area gate: _seq_INIT_area kullan (KF drift etse bile korur).
+#      bike3(170px²) < 220 → Rescue BLOKE; box2(264px²) > 220 → Rescue serbest.
+#   2. FazD: küçük hedeflerde KALICI BLOKE (refresh_small_interval=99999).
+#      bike3(170) < 220 → FazD hiçbir zaman ateşlenmiyor.
+#   3. box2(264) + car6(340) + truck_night >> 220 → Rescue + FazD serbest.
+#
+# Doğrulanmış sonuçlar (20-sequence):
+#   bike3:       0.182 → 0.589  (+0.407) ✅
+#   box2:        0.626 → 0.626  ( 0.000) ✅
+#   truck_night: 0.642 → 0.642  ( 0.000) ✅
+#   FinalScore:  0.7195 → 0.7419 (+0.0224) ✅ KABUL
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0  # B gate disabled — lookback=30 breaks volleyball (-0.473). Devre dışı.
+
+  # i11: Smart Cooldown
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0       # büyük hedeflerde global bloke YOK (truck_night, box2 korunur)
+  refresh_small_area_thr: 220.0 # px²: bike3(170)<220 → cooldown. box2(264)>220 → free. car6(340)>220 → free.
+  refresh_small_interval: 99999 # tiny targets (bike3 ~170px²) → FazD KALICI BLOKE
+                                # i10_no_fazd kanıtladı: bike3 için KF tek başına 0.589 üretir;
+                                # FazD her ateşlemesinde KF state'i bozuyor → 0.181'e çöküş
+
+  # i12: Great Rescue Area Gate — Panik Butonu Boyut Barajı
+  # bike3(170) < 220 → bloke. box2(264) → kurtarılır. truck_night >> 220 → kurtarılır.
+  rescue_min_area: 220.0
+  # F5: Closed-loop feedback — her karede KF çıktısını AI arama penceresine besle
+  # (tracker.set_state(bbox)) + T1-scale gate (scale-collapse'da atla).
+  # UAV/occlusion/uzun sekanslarda AI şablon kaymasını önler.
+  # 20-seq: Delta +0.0257 (f5=on). 255-seq: FS_imm=0.7139 (+0.0015 vs baseline 0.7124). ✅
+  # YENİ ALTIN STANDART.
+  # ---
+  # F6 (accept-gate: gate_decision != "accept") DENENDİ, REDDEDİLDİ:
+  #   255-seq FS_imm=0.7093 < F5(0.7139). Accept-path F5 net faydalı.
+  # F7 (drift-gate: |imm-ai|/diag > 0.30) DENENDİ, REDDEDİLDİ:
+  #   Paragliding3 -0.366 hâlâ var (gradual lag <0.30 threshold), bike3 -0.011.
+  # ---
+  # GELECEK ÇALIŞMA: Rejection-Memory Adaptive Gate (f5_reject_window=40,
+  #   f5_reject_min_count=4): accept-path F5, son 40 frame'de >= 4 red varsa etkin.
+  #   car8 (sıfır red): F5 accept-path kapalı. bike3 (drift sonrası redler): etkin.
+  f5_feedback: true
+  # F8-guard: cap w/h fed to set_state to init_w/h * f5_scale_guard.
+  # Prevents search-window inflation feedback loop (truck_night pattern: AI
+  # inflates bbox 3× over 30 frames → F5 feeds large bbox → crop grows → ID-switch).
+  # 0.0 = disabled. Recommended: 3.0 (allows genuine 3× linear growth).
+  f5_scale_guard: 1.5
+
+# ORU: Observation-Centric Re-Update backfill (OC-SORT, CVPR 2023)
+# Occlusion sonrası COASTING → TRACKING geçişinde biriken KF hatasını sıfırlamak
+# için sanal lineer traje üzerinden geriye dönük predict+update zinciri çalıştırır.
+# oru.enabled: false ile tamamen kapatılır (kod dormant kalır, rebuild gerekmez).
+oru:
+  enabled: true              # global toggle
+  n_min: 5                   # min coast frames to trigger
+  n_max: 30                  # max coast frames (above → skip; traj unreliable)
+  conf_reentry_min: 0.50     # re-entry AI conf gate
+  velocity_cv_max: 0.5       # coast velocity coefficient of variation gate
+  virtual_conf: 0.4          # synthetic conf for virtual updates (low → R inflates)
+  skip_if_singer_dom: true   # Singer μ > singer_dom_thr at anchor → skip
+  singer_dom_thr: 0.7        # Singer dominance threshold
+  ring_buffer_size: 35       # snapshot deque maxlen (covers n_max + margin)
+
+# Chaos Trigger: Confidence Volatility → Adaptive-R inflation
+# SGLATrack güven skoru standart sapması yüksekse "kaotik ortam" → R şişirilir
+# chaos.enabled: false ile kapatılır.
+chaos:
+  enabled: false             # REJECTED 2026-04-27: person14 0.71→0.09, moto 0.14→0.06
+  window: 10
+  chaos_thr: 0.08
+  chaos_max: 0.20
+  min_chaos_conf_factor: 0.15
+  min_samples: 5

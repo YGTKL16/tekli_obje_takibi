@@ -1,99 +1,34 @@
 # Optuna-tuned unified IMM parameters (13D, LODO CV)
-# FinalScore: AI-only=0.6635  Default-IMM=0.6610  Tuned-IMM=0.6637
-# Delta vs AI-only: +0.0002
-# Trials: 2000, Sequences: 20, Folds: 5
+# FinalScore: AI-only=0.6635  Default-IMM=0.6635  Tuned-IMM=0.6491
+# Delta vs AI-only: -0.0144
+# Trials: 100, Sequences: 20, Folds: 5
 
 imm:
-  q_scale: 31.113513
+  q_scale: 3.520009
   measurement_noise:
-    r_pos_scale: 44.953786
-    r_size_scale: 2.107025
+    r_pos_scale: 3.969220
+    r_size_scale: 0.202516
   transition_matrix:
-    pi_persist: 0.9600
+    pi_persist: 0.8762
 
 decision:
-  conf_threshold: 0.186309
-  coast_threshold: 0.140301
-  max_coast_frames: 44
+  conf_threshold: 0.172182
+  coast_threshold: 0.115802
+  max_coast_frames: 21
 
 blend:
-  alpha_conf_lo: 0.373544
-  alpha_conf_hi: 0.845429
+  alpha_conf_lo: 0.390322
+  alpha_conf_hi: 0.563076
 
 hygiene:
-  reinit_after: 10
-  max_area_frac: 0.345940
-  max_center_jump_frac: 0.511044
+  reinit_after: 50
+  max_area_frac: 0.512124
+  max_center_jump_frac: 0.434532
   aspect_ratio_lo: 0.1
-  aspect_ratio_hi: 7.099779
+  aspect_ratio_hi: 5.931703
 
 smart_intervention:
-  conf_bypass_threshold: 0.740469
-  innovation_threshold: 1.454772
-  sm_conf_threshold: 0.155357
-  sm_max_coast: 69
-  # Phase 4: lower bypass threshold when IMM CA/Singer mode exceeds this probability
-  maneuver_threshold: 0.40
-  maneuver_bypass_boost: 0.10
-
-adaptive_r:
-  enabled: true
-  # Phase 2: quadratic scaling — R ∝ 1/conf² → low-conf AI measurement gets
-  # 44× more noise vs 2.5× with the old linear floor=0.4 formula.
-  floor: 0.01
-  r_exponent: 2.0
-
-singer:
-  alpha: 3.0        # 1/τ — maneuver correlation time inverse; range: (0, 20]
-                    # τ=0.33 frame → fast UAV; was 1.0. H3 test: same 20-seq score
-                    # (FinalScore=0.7140), uav1 dAUC: -0.292 → -0.020 (+0.272!)
-  sigma2_a: 100.0   # acceleration variance [px²/frame⁴]; range: (0, 500]
-                    # √100=10 px/frame² std dev. was 25.0. α→0 degenerates to CA.
-
-mahalanobis:
-  chi2_threshold: 23.51   # χ²(4 dof, p=0.0001) innovation gate; range: [7.78, 23.51]
-                           # Grid-search optimal on 20-seq subset (Δ=+0.0015 vs no-gate)
-                           # Lower → stricter rejection (aerial: use 13.28)
-                           # Higher → more permissive (static/structure: 23.51 = cap)
-  bypass_after: 2          # bypass gate when reject_streak >= N (prevent death-loop)
-  # R base values matching the scaled measurement noise (r_pos_scale * 1.0,
-  # r_size_scale * 10.0) so the gate operates in the same units as the filter.
-  r_pos_base: 44.953786    # = imm.measurement_noise.r_pos_scale * 1.0
-  r_size_base: 21.07025    # = imm.measurement_noise.r_size_scale * 10.0
-
-ai:
-  # Faz C1: IMM Intelligence — skip AI on stable CV frames to save latency.
-  # Singer guard ensures AI always runs during manoeuvres (Singer > singer_skip_thr).
-  # RESULT: Δ=−0.0114 (default) / Δ=−0.0032 (extreme thresholds) → REJECT (CV skip)
-  # CA-only skip (cv_stable_thr=1.1): Δ=−0.0007 ≈ neutral, not useful for accuracy.
-  skip_when_confident: false
-  max_consecutive_skips: 2
-  # Faz C1b: Parametrised skip thresholds (tunable via Optuna)
-  singer_skip_thr: 0.35    # Singer > this → always run AI (manoeuvre guard)
-  cv_stable_thr: 0.70      # CV > this → allow skip (DISABLED: skip_when_confident=false)
-  cv_conf_min: 0.65        # conf > this required to allow CV skip
-  # Faz C2: Singer-adaptive search window expansion — REJECT (permanently 0.0)
-  # boost=1.0: Delta=-0.0718 (volleyball -0.466, basketball -0.417, Girl2 -0.266)
-  # Root cause: set_state(expanded_bbox) corrupts AI template size on any Singer-firing seq.
-  search_scale_boost: 0.0  # REJECT — do not tune
-  # Faz D: Proactive template refresh — re-center AI search at KF-fused bbox
-  # when confidence lingers in the moderate zone for refresh_patience frames.
-  # Declining-conf gate: best combination tested.
-  # thr=0.04: fires for genuine drift (truck_night -0.12, car1_s, air_cond)
-  #   but also catches fast natural dips (bike3 -0.407, surfer -0.099)
-  #   → net Delta +0.0511 (best overall)
-  # thr=0.10: bike3 STILL -0.389 (long drift > 0.10 still triggers),
-  #   reduced gains everywhere → +0.0225. Worse.
-  # trigger_max=0.45: +0.0383. trigger_max dual: +0.0183. All < thr=0.04.
-  # thr=0.04 is the committed winner.
-  conf_refresh_low:   0.35
-  conf_refresh_high:  0.65
-  refresh_patience:   8
-  # Decline gate (start vs end): thr=0.04 → Delta=+0.0511 (committed winner)
-  # Streak-mean < 0.48: Delta=−0.0186 (truck_night never accumulates 8-consecutive)
-  refresh_decline_thr: 0.04
-  # Bbox-area gate: INVESTIGATED (E2), REJECTED — bike3 KF bbox inflates over
-  # time (164 → 3421+ px²) so no fixed threshold permanently blocks the cascade.
-  # air_cond beneficial triggers overlap with bike3 harmful triggers at area
-  # 200–300 px². No clean separation exists. Set to 0 (disabled).
-  refresh_min_bbox_area: 0.0
+  conf_bypass_threshold: 0.700143
+  innovation_threshold: 1.666644
+  sm_conf_threshold: 0.481440
+  sm_max_coast: 10

@@ -1,0 +1,91 @@
+# L1: Alpha Blend Activation — Soft Innovation Blending  [REJECTED ❌]
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+# REJECT: k_conf=5.0 → bike5=-0.015, uav1 canary=-0.038. Accumulated lag.
+#
+# Motivasyon:
+#   _compute_update_alpha() k_conf=0 AND lambda=0 → daima 1.0 döner → NOP.
+#   i12 config'de soft_fusion section yok → alpha blending hiç etkinleşmemiş.
+#
+#   z_soft = predicted + alpha * innov
+#   alpha=1.0 (binary gate): ya tam güncelleme ya da red
+#   alpha<1.0 (yumuşak): düşük-conf veya yüksek-Mahanobis algıları KF'e kısmen yazılır.
+#
+# L1 Parametreleri:
+#   k_conf=5.0:   sigmoid slope — conf=0.74'te α≈0.77, conf=0.5'te α≈0.50, conf=0.3'te α≈0.12
+#   lambda=0.3:   Mahalanobis suppression — d2=chi2_max'ta exp(-0.3)≈0.74 azalma
+#
+#   Singer escape hatch mevcut: singer_prob > 0.40 → alpha = max(alpha, singer_prob)
+#   → gerçek manevralarda alpha düşmez.
+#
+# Canary target sequences:
+#   truck1:  T1 koruması — scale-collapse guard bozulmamalı (delta≈0)
+#   uav1:    IMM'in gerçek kazandığı seq — delta=+0.041 korunmalı
+#   bike5:   IMM gerçek kazanç — delta=+0.014 korunmalı
+#   bus2-n:  Küçük IMM kaybı — delta=-0.012, blending düzeltmeli
+#
+# Karar kriteri:
+#   |delta(l1) - delta(i12+T1)| > +0.001 → KABUL
+#   |delta(l1) - delta(i12+T1)| ∈ [-0.001, +0.001] → GÖZLE (Optuna ile rafine et)
+#   delta(l1) < delta(i12+T1) - 0.002 → RED
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+
+soft_fusion:
+  alpha_gate_k_conf: 5.0     # sigmoid slope on confidence axis
+  alpha_gate_lambda: 0.3     # Mahalanobis suppression term (exp(-λ·d²/χ²_max))

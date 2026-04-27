@@ -1,0 +1,111 @@
+# N7: F5 Position-Only
+#
+# Kaizen Trial | 2026 | Baseline: i12 IMM=0.7139 (255-seq)
+#
+# Root-cause analysis:
+#   f5 fires set_state(kf_bbox) every frame in ai_lead mode.
+#   - KF position: well-tracked (r_pos_scale=44.95 → moderate Kalman gain)
+#   - KF size: LAGGED (r_size_scale=2.107 → LOW Kalman gain → slow size update)
+#
+#   For car6: AI correctly tracks at true size → f5 replaces AI's correct size
+#             with KF's lagged smaller estimate → car6 -0.021 regression
+#   For truck_night: AI drifts spatially even when "accepted" (conf > threshold)
+#             → f5 position anchor (set_state to KF center) corrects drift → +0.161
+#
+#   n4 (coast_only): both sequences have high acceptance → coast_only never fires
+#                    for truck_night → loses +0.161 benefit
+#   n5 (reject_gate): truck_night has ACCEPTED but wrong detections → rolling
+#                     reject window rarely fills → loses +0.161 benefit too
+#
+# N7 fix: f5_pos_only
+#   set_state(kf_position + last_good_bbox_size)
+#   - Position anchor: KF-predicted center → corrects truck_night drift → benefit preserved
+#   - Size: last accepted detection size → no KF size lag → car6 regression eliminated
+#
+#   car6: last_good_bbox updated every frame (all accepted) → current accepted size
+#          → f5 sets AI to (KF_center ≈ AI_center, AI_size) → minimal perturbation
+#          → 0 regression expected
+#   truck_night: last_good_bbox from last accepted frame (maybe several ago)
+#          → good size estimate, KF center corrects drift → full benefit preserved
+#
+# This is strictly better than i12 (fixes car6/building2) and n4/n5 (preserves truck_night)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  coast_threshold: 0.140301
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  mahal_chi2_threshold: 23.51
+  r_exponent: 2.0
+  adaptive_r: true
+
+regime_adaptive: false
+
+gmc:
+  enabled: false
+  method: ecc
+  min_inliers: 20
+  max_rot_deg: 3.0
+
+ai:
+  kf_mode: ai_lead
+  search_scale_boost: 0.0
+  maneuver_pi_enabled: false
+  refresh_patience: 8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  f5_feedback: true
+  f5_scale_guard: 1.5
+  # N7: Position-only F5 — KF position + last_good_bbox size
+  # Fires every frame (preserves truck_night position-anchor benefit)
+  # Uses last accepted detection size (no KF size-lag → no car6 regression)
+  f5_pos_only: true
+
+oru:
+  enabled: true
+  n_min: 5
+  n_max: 30
+  conf_reentry_min: 0.50
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+  skip_if_singer_dom: true
+  singer_dom_thr: 0.7
+  ring_buffer_size: 35
+
+chaos:
+  enabled: false
+  window: 10
+  chaos_thr: 0.08
+  chaos_max: 0.20
+  min_chaos_conf_factor: 0.15

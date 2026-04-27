@@ -1,0 +1,102 @@
+# I3: ROI CLAHE (Contrast Limited Adaptive Histogram Equalization)
+#
+# Hypothesis: Several sequences in dataset3 have "-n" suffix (night).
+#   car1-n, bus2-n etc. have dark frames where DeiT-Tiny (SGLATrack) loses
+#   target due to low contrast. CLAHE applied to the KF-predicted search ROI
+#   before AI inference enhances local contrast without distorting colour.
+#
+# Method:
+#   - After kf.predict(), expand predicted bbox by roi_scale=3.0 to cover
+#     the AI search window (typically 4-5× bbox).
+#   - Apply CLAHE (clip=2.0, tile=8) to L channel (LAB space) in that ROI.
+#   - Pass enhanced frame_rgb to tracker.track(). Template is NOT touched.
+#
+# Risk: LOW — Python only, no C++ change, disabled by default.
+#   CLAHE won't over-enhance bright frames (clip_limit=2.0 is conservative).
+#   LAB L-only preserves colour so matched-filter correlation is not corrupted.
+#
+# Everything else: identical to h3_singer_uav.yaml (current best config).
+# Baseline: raw FinalScore=0.7116, IMM=0.6550 (kaizen_submission2.log)
+# Expected: improvement on night/low-contrast sequences (car1-n, bus2-n, etc.)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786   # px² position measurement noise; range [1, 100]
+    r_size_scale: 2.107025   # px² size measurement noise; range [0.1, 20]
+  transition_matrix:
+    pi_persist: 0.9600       # IMM model self-persistence; range [0.80, 0.99]
+
+decision:
+  conf_threshold: 0.186309   # minimum conf to accept; range [0.05, 0.5]
+  coast_threshold: 0.140301  # below → coast; range [0.01, 0.3]
+  max_coast_frames: 44       # range [5, 100]
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0            # R ∝ 1/conf²; aggressive low-conf penalty
+
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
+singer:
+  alpha: 3.0        # UAV-tuned; range (0, 20]
+  sigma2_a: 100.0   # px²/frame⁴; UAV range [100, 200]
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+# I3: ROI CLAHE — the delta contributor
+clahe:
+  enabled: true             # apply contrast enhancement in AI search ROI
+  clip_limit: 2.0           # CLAHE clip limit; range [0.5, 8.0]. 2.0 = mild, safe
+  roi_scale: 3.0            # ROI expansion around predicted bbox; range [1.5, 6.0]
+  tile_size: 8              # tile grid size (NxN); range [4, 16]

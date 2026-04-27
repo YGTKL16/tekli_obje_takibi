@@ -94,8 +94,10 @@ def test_replay_sequence_returns_kf_prediction_while_coasting(tmp_path):
 
     pred_bboxes = replay_sequence(str(cache_path), DEFAULT_PARAMS)
 
-    assert pred_bboxes[1] == pytest.approx(init_bbox)
-    assert pred_bboxes[1] != pytest.approx(ai_bboxes[1])
+    # AI-fallback: during coast (should_coast=True) the detection location is
+    # preferred over KF extrapolation for F5 closed-loop feedback.
+    assert pred_bboxes[1] == pytest.approx(ai_bboxes[1])
+    assert pred_bboxes[1] != pytest.approx(init_bbox)
 
 
 def test_replay_sequence_rejects_physically_implausible_measurement(tmp_path):

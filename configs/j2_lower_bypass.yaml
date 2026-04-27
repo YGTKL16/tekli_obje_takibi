@@ -1,0 +1,92 @@
+# J2: Lower Bypass Threshold — High-AUC Sequence Detox
+#
+# Kaizen Trial — 2026-04-26 | REJECTED ❌
+# Baseline: i12_rescue_area_gate.yaml | FS_raw=0.7110  FS_imm=0.7093  Delta=-0.0018
+# J2 result:                           | FS_raw=0.7125  FS_imm=0.7091  Delta=-0.0033
+#
+# REJECT reason: conf_bypass_threshold: 0.620 introduced new regressions:
+#   car9:      raw=0.794 → imm=0.383  (-0.411) — NEW regression
+#   wakeboard5: raw=0.639 → imm=0.493 (-0.146) — NEW regression
+#   bird1_1:   raw=0.295 → imm=0.152  (-0.143) — NEW regression
+# truck1 improved (+0.106) but car9/wakeboard5 net loss > gain.
+# Lower bypass allows more frames to skip KF gating → lower-conf frames get
+# AI detection used directly → on complex dynamic sequences this causes ID drift.
+#
+# Diagnosis (255-seq eval):
+#   dataset5 [0.8-1.0] bucket: mean_delta = -0.0031 (36 seqs)
+#   truck1:     raw=0.822 → imm=0.714  (-0.107) ← REAL structural damage
+#   person22:   raw=0.840 → imm=0.830  (-0.010) ← secondary real damage
+#   car1_1/1_2: raw=0.880/0.775        (-0.001/-0.002) ← micro damage
+#
+# Root cause: conf 0.62-0.74 frames go through KF gating instead of bypass.
+#   → Mahalanobis gate can reject good AI detections (truck sudden stop/turn)
+#   → KF prediction stays "ahead" of the target
+#   → Search window drifts → conf drops → cascade failure
+#
+# Fix: Lower conf_bypass_threshold 0.740 → 0.620
+#   → Frames with conf ≥ 0.62 now bypass KF gating entirely
+#   → Sanity check (max_center_jump_frac, aspect_ratio) still applies
+#   → KF is still updated on bypass frames to stay in sync
+#
+# Expected:
+#   truck1:      Δ ≈ +0.05 to +0.08 (cascade failure eliminated)
+#   person22:    Δ ≈ +0.005 to +0.010
+#   Paragliding3: unaffected (its gain comes from conf < 0.62 occlusion frames)
+#   Net FinalScore: +0.002 to +0.004 expected
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.620   # MUTATION: was 0.740469 → lower by ~16%
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70

@@ -1,0 +1,127 @@
+# N2b: Rejection-Memory Gate (min_count=1) — F5 Adaptive Suppression
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12_rescue_area_gate.yaml IMM=0.7139 (255-seq)
+#
+# Problem (Silent Drift Loop):
+#   F5 closed-loop feedback is net +0.0015 over 255 sequences, but causes catastrophic
+#   regression on 7/10 watchlist sequences (car8: -0.410, uav4: -0.350, runner2: -0.243).
+#   Root cause: when AI + KF are both locked onto the wrong target (or a slowly drifting
+#   one), BOTH agree — every metric looks "good" from inside the loop.
+#   Per-frame diagnostics (F6 accept-gate, F7 drift-gate) cannot distinguish this:
+#     - F6 tested → 255-seq FS 0.7093 << 0.7139 (many good sequences lost feedback)
+#     - F7 tested → Paragliding3 lag accumulates gradually, stays under 30% per-frame
+#
+# Hypothesis:
+#   Car8 has ZERO rejects (AI fully confident, KF agrees) → silent joint drift.
+#   Bike3 / uav1 / bus2-n have frequent rejects (AI maneuvering, partial occlusion)
+#   → F5 is actually helpful, steering AI back to correct region.
+#
+#   Solution: look back 40 frames. If fewer than 4 rejects → AI+KF are "comfortable"
+#   together → SUPPRESS F5 (no feedback loop closed). If >= 4 rejects → AI struggling
+#   → KEEP F5 active (feedback helps re-anchor AI on KF).
+#
+# New parameters (both default to 0 → gate disabled, backward-compatible with i12):
+#   f5_reject_window:     how many frames to look back (ring buffer size)
+#   f5_reject_min_count:  minimum rejects to enable F5
+#
+# Expected gains (canary sequences):
+#   car8:       base AUC 0.447 → ~0.856 (+0.41)  [0 rejects → F5 off, drift stops]
+#   uav2:       base AUC 0.451 → ~0.561 (+0.11)  [few rejects → F5 off]
+#   runner2:    base AUC 0.488 → ~0.732 (+0.24)  [few rejects → F5 off]
+#   Motor2:     base AUC 0.553 → ~0.699 (+0.15)  [few rejects → F5 off]
+# Protected sequences (should stay at base level):
+#   bike3:      many rejects → F5 stays on
+#   uav1:       many rejects → F5 stays on
+#   bus2-n:     occlusion rejects → F5 stays on
+#
+# Build from: configs/i12_rescue_area_gate.yaml (golden standard)
+# All parameters below inherit i12 values; only N2 additions are listed here.
+#
+# Test: python3 scripts/ab_test.py --imm-config configs/n2_reject_memory.yaml \
+#           --mode ai_lead --gmc --adaptive-r --f5-feedback \
+#           --seq dataset3/car8 --seq dataset5/bike3 --seq dataset4/uav1 --seq dataset3/bus2-n
+# Full: python3 scripts/ab_test.py --imm-config configs/n2_reject_memory.yaml \
+#           --mode ai_lead --gmc --adaptive-r --f5-feedback
+
+# ── N2 additions ──────────────────────────────────────────────────────────────
+# Rejection-memory ring buffer window (frames). 0 = gate disabled (i12 identical).
+f5_reject_window: 40         # look-back window in frames (0 = disabled)
+f5_reject_min_count: 1       # min rejects in window to allow F5 (< this → suppress)
+
+# ── Inherited from i12_rescue_area_gate.yaml (unchanged) ─────────────────────
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+ai:
+  conf_refresh_high: 0.65
+  conf_refresh_low: 0.35
+  cv_conf_min: 0.65
+  cv_stable_thr: 0.7
+  f5_feedback: true
+  f5_scale_guard: 1.5
+  max_consecutive_skips: 2
+  refresh_bypass_lookback: 0
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_patience: 8
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  search_scale_boost: 0.0
+  singer_skip_thr: 0.35
+  skip_when_confident: false
+blend:
+  alpha_conf_hi: 0.845429
+  alpha_conf_lo: 0.373544
+chaos:
+  chaos_max: 0.2
+  chaos_thr: 0.08
+  enabled: false
+  min_chaos_conf_factor: 0.15
+  min_samples: 5
+  window: 10
+decision:
+  coast_threshold: 0.140301
+  conf_threshold: 0.186309
+  max_coast_frames: 44
+hygiene:
+  aspect_ratio_hi: 7.099779
+  aspect_ratio_lo: 0.1
+  max_area_frac: 0.34594
+  max_center_jump_frac: 0.511044
+  reinit_after: 10
+imm:
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  q_scale: 31.113513
+  transition_matrix:
+    pi_persist: 0.96
+mahalanobis:
+  bypass_after: 5
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  bypass_conf_thr: 0.7
+  bypass_vel_thr: 3.0
+  chi2_threshold: 23.51
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+oru:
+  enabled: true
+  n_min: 5
+  n_max: 30
+  conf_reentry_min: 0.50
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+  skip_if_singer_dom: true
+  singer_dom_thr: 0.7
+  ring_buffer_size: 35
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  maneuver_bypass_boost: 0.1
+  maneuver_threshold: 0.4
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69

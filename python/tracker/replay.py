@@ -115,6 +115,11 @@ def replay_sequence(cache_path: str, params: dict) -> list:
     alpha_gate_k_conf = float(params.get("alpha_gate_k_conf", 0.0))
     alpha_gate_lambda = float(params.get("alpha_gate_lambda", 0.0))
     reacq_r_decay = float(params.get("reacq_r_decay", 0.0))
+    # Dynamic bypass params
+    mahal_bypass_conf_thr  = float(params.get("mahal_bypass_conf_thr",  0.0))
+    mahal_bypass_vel_thr   = float(params.get("mahal_bypass_vel_thr",   0.0))
+    mahal_bypass_after_fast = int(params.get("mahal_bypass_after_fast", 2))
+    mahal_bypass_after_slow = int(params.get("mahal_bypass_after_slow", 5))
     # Faz C1: AI skip when confident (replicated from Pipeline._should_skip_ai)
     ai_skip_when_confident = bool(params.get("ai_skip_when_confident", False))
     ai_max_consecutive_skips = int(params.get("ai_max_consecutive_skips", 2))
@@ -124,8 +129,12 @@ def replay_sequence(cache_path: str, params: dict) -> list:
 
     # Create filter and decision maker
     kf = tracker_cpp.IMMFilter()
+    q_size_vel_scale = float(params.get("q_size_vel_scale", 1.0))
     for m in range(3):
-        kf.set_model_process_noise(m, _build_model_q(m, q_scale))
+        Q = _build_model_q(m, q_scale)
+        Q[6, 6] *= q_size_vel_scale  # vw: scale velocity noise
+        Q[7, 7] *= q_size_vel_scale  # vh: scale velocity noise
+        kf.set_model_process_noise(m, Q)
     kf.set_measurement_noise(_build_measurement_r(r_pos_scale, r_size_scale))
     kf.set_transition_matrix(_build_transition_matrix(pi_persist))
 
@@ -226,6 +235,11 @@ def replay_sequence(cache_path: str, params: dict) -> list:
                 alpha_gate_k_conf=alpha_gate_k_conf,
                 alpha_gate_lambda=alpha_gate_lambda,
                 reacq_r_decay=reacq_r_decay,
+                # Dynamic bypass
+                mahal_bypass_conf_thr=mahal_bypass_conf_thr,
+                mahal_bypass_vel_thr=mahal_bypass_vel_thr,
+                mahal_bypass_after_fast=mahal_bypass_after_fast,
+                mahal_bypass_after_slow=mahal_bypass_after_slow,
             )
             bbox = step.bbox
             last_good_bbox = step.last_good_bbox

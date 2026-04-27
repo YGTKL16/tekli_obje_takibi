@@ -147,6 +147,9 @@ PYBIND11_MODULE(tracker_cpp, m) {
         .def("set_adaptive_r_floor", &tracker::KalmanFilter::set_adaptive_r_floor,
              py::arg("floor"),
              "Set confidence floor for adaptive R (default 0.4)")
+        .def("set_adaptive_r_cap", &tracker::KalmanFilter::set_adaptive_r_cap,
+             py::arg("cap"),
+             "Set max R multiplier vs baseline (default 10.0)")
         .def("get_state", &tracker::KalmanFilter::get_state,
              py::return_value_policy::reference_internal)
         .def("get_covariance", &tracker::KalmanFilter::get_covariance,
@@ -189,6 +192,9 @@ PYBIND11_MODULE(tracker_cpp, m) {
         .def("set_adaptive_r_floor", &tracker::IMMFilter::set_adaptive_r_floor,
              py::arg("floor"),
              "Set confidence floor for adaptive R (default 0.4)")
+        .def("set_adaptive_r_cap", &tracker::IMMFilter::set_adaptive_r_cap,
+             py::arg("cap"),
+             "Set max R multiplier vs baseline (default 10.0); prevents unbounded inflation")
         .def("get_state", &tracker::IMMFilter::get_state,
              py::return_value_policy::reference_internal,
              "Combined state estimate [x,y,w,h,vx,vy,vw,vh,ax,ay]")
@@ -200,6 +206,11 @@ PYBIND11_MODULE(tracker_cpp, m) {
              "Model probabilities [mu_CV, mu_CA, mu_Singer]")
         .def("is_initialized", &tracker::IMMFilter::is_initialized)
         .def("reset", &tracker::IMMFilter::reset)
+        .def("restore_from", &tracker::IMMFilter::restore_from,
+             py::arg("state"), py::arg("P"), py::arg("mu"),
+             "Restore filter to a checkpoint (combined state, P, mode probs). "
+             "Replicates state/P to all per-model slots; sets mu directly. "
+             "Used by ORU re-update.")
         .def("set_transition_matrix", &tracker::IMMFilter::set_transition_matrix,
              py::arg("pi"),
              "Override Markov transition matrix (3x3)")
@@ -214,6 +225,11 @@ PYBIND11_MODULE(tracker_cpp, m) {
              "Configure Singer physics: alpha=1/tau (maneuver time reciprocal), "
              "sigma2_a=acceleration variance [px^2/frame^4]. Rebuilds F and Q immediately. "
              "alpha range: (0,20], sigma2_a range: (0,500].")
+        .def("set_ar_q_sensitivity", &tracker::IMMFilter::set_ar_q_sensitivity,
+             py::arg("sensitivity"), py::arg("boost_cap") = 3.0F,
+             "Enable dynamic Q scaling based on AR rate of change. "
+             "Boost = min(1 + |delta_AR| * sensitivity, boost_cap). "
+             "sensitivity=0 disables (default). Typical: sensitivity 5-20, boost_cap 2-5.")
         .def("mahalanobis_sq",
              [](const tracker::IMMFilter& self,
                 py::array_t<float, py::array::c_style | py::array::forcecast> z_arr) -> float {
@@ -259,6 +275,13 @@ PYBIND11_MODULE(tracker_cpp, m) {
              py::arg("n"));
 
     // ── GMCEstimator (ORB + partial-affine) ─────────────────────
+    py::class_<tracker::GMCEstimateStats>(m, "GMCEstimateStats")
+        .def(py::init<>())
+        .def_readonly("match_count", &tracker::GMCEstimateStats::match_count)
+        .def_readonly("inlier_count", &tracker::GMCEstimateStats::inlier_count)
+        .def_readonly("inlier_ratio", &tracker::GMCEstimateStats::inlier_ratio)
+        .def_readonly("has_affine", &tracker::GMCEstimateStats::has_affine);
+
     py::class_<tracker::GMCEstimator>(m, "GMCEstimator")
         .def(py::init<int32_t, int32_t, float, float, float, float>(),
              py::arg("n_features")           = tracker::kGmcDefaultFeatures,
@@ -301,5 +324,40 @@ PYBIND11_MODULE(tracker_cpp, m) {
              py::arg("prev_gray"),
              py::arg("curr_gray"),
              py::arg("fg_xywh"),
-             "Estimate 3x3 affine-embedded homography (prev -> curr).");
+             "Estimate 3x3 affine-embedded homography (prev -> curr).")
+        .def("estimate_with_stats",
+             [](tracker::GMCEstimator& self,
+                py::array_t<uint8_t, py::array::c_style> prev_gray,
+                py::array_t<uint8_t, py::array::c_style> curr_gray,
+                py::array_t<float, py::array::c_style | py::array::forcecast> fg_xywh
+             ) -> py::tuple {
+                 const py::buffer_info p_info = prev_gray.request();
+                 const py::buffer_info c_info = curr_gray.request();
+                 const py::buffer_info f_info = fg_xywh.request();
+
+                 if (p_info.ndim != 2 || c_info.ndim != 2) {
+                     throw py::value_error("prev/curr must be 2-D grayscale");
+                 }
+                 if (f_info.ndim != 1 || f_info.shape[0] < 4) {
+                     throw py::value_error("fg_xywh must have shape (4,)");
+                 }
+
+                 cv::Mat p_mat(static_cast<int>(p_info.shape[0]),
+                               static_cast<int>(p_info.shape[1]),
+                               CV_8UC1, p_info.ptr);
+                 cv::Mat c_mat(static_cast<int>(c_info.shape[0]),
+                               static_cast<int>(c_info.shape[1]),
+                               CV_8UC1, c_info.ptr);
+                 auto* fg_ptr = static_cast<float*>(f_info.ptr);
+                 float fg[4] = {fg_ptr[0], fg_ptr[1], fg_ptr[2], fg_ptr[3]};
+
+                 tracker::HomMat H;
+                 tracker::GMCEstimateStats stats{};
+                 bool ok = self.estimate_with_stats(p_mat, c_mat, fg, H, stats);
+                 return py::make_tuple(H, ok, stats);
+             },
+             py::arg("prev_gray"),
+             py::arg("curr_gray"),
+             py::arg("fg_xywh"),
+             "Estimate affine motion and expose raw match/inlier statistics.");
 }

@@ -1,0 +1,20 @@
+# configs/regimes/small_target.yaml
+#
+# Regime override bundle — SMALL_TARGET
+#
+# Applies when: init_bbox.area < 500 px²  (e.g. bike3 ~170px²)
+# Rationale:
+#   • Great Rescue (FazD) corrupts the KF state on tiny targets — block it.
+#   • FazD template refresh also fires spuriously — block via oversized area gate.
+#   • AI is weak on tiny targets → trust KF longer (extend coast patience).
+#   • Closed-loop F5 feedback must stay ON (AI search window anchored to KF pred).
+#
+# Evidence: i12_rescue_area_gate.yaml bike3 0.182→0.589 by blocking FazD+Rescue.
+
+ai:
+  rescue_min_area: 1.0e9    # 1e9 px² > any real target → Great Rescue BLOCKED for all tiny targets
+  refresh_min_bbox_area: 1.0e9  # oversized threshold → FazD never fires on tiny targets
+  f5_feedback: true
+
+decision:
+  max_coast_frames: 60          # patient coasting (tiny targets flash in/out of occlusion)

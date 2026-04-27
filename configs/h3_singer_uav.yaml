@@ -46,6 +46,21 @@ adaptive_r:
   floor: 0.01
   r_exponent: 2.0
 
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
 singer:
   # H3: UAV-tuned Singer. Literature: quadrotor α=2-5, σ²_a=100-200.
   # α=3.0 → maneuver correlation time τ=1/3 frame (was τ=1 frame with α=1.0)
@@ -72,4 +87,4 @@ ai:
   conf_refresh_high:  0.65
   refresh_patience:   8
   refresh_decline_thr: 0.04
-  refresh_min_bbox_area: 0.0
+  refresh_bypass_lookback: 30   # B gate: block Faz D if AI was in bypass within 30 frames

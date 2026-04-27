@@ -140,6 +140,7 @@ class TRTTrackWrapper:
 
         # Hann window for score weighting
         self.output_window = _hann2d(self.feat_sz, self.feat_sz)
+        self._ema_patch_f32: np.ndarray | None = None
 
     def __del__(self):
         """Release TensorRT resources and CUDA memory."""
@@ -212,6 +213,27 @@ class TRTTrackWrapper:
             tag = "INPUT" if info["is_input"] else "OUTPUT"
             print(f"  {tag} {name}: {info['shape']} {info['np_dtype'].__name__}")
 
+    def reset_context(self):
+        """Recreate the TRT execution context to clear any residual engine state.
+
+        TRT FP16 inference has mild non-determinism: the first pass through a
+        sequence can produce slightly different score maps depending on GPU
+        workspace initialization.  When ab_test.py runs raw THEN imm for the
+        same sequence, the imm run sees a "primed" workspace state from the raw
+        run, causing reproducible but biased results.
+        Calling reset_context() between the two runs restores a clean context so
+        both passes start from the same (uninitialized) workspace state.
+        """
+        if not self._engine_loaded:
+            return
+        del self._context
+        self._context = self._engine.create_execution_context()
+        for name, info in self._io.items():
+            self._context.set_tensor_address(name, info["gpu"].data_ptr())
+        if hasattr(self, "_out_bufs"):
+            del self._out_bufs
+        self.initialized = False  # require re-init before next track()
+
     def _infer(self, template_np, search_np):
         """Run TensorRT inference.
 
@@ -263,6 +285,7 @@ class TRTTrackWrapper:
         # Extract and preprocess template
         z_patch, _, _ = _sample_target(frame, self._state, self.template_factor, self.template_size)
         self._z_tensor = _preprocess(z_patch)
+        self._ema_patch_f32 = None  # reset EMA buffer on fresh init
 
         self.initialized = True
 
@@ -270,6 +293,30 @@ class TRTTrackWrapper:
         """Synchronize the internal search state with the chosen bbox."""
         bbox_list = bbox.tolist() if isinstance(bbox, np.ndarray) else list(bbox)
         self._state = [float(x) for x in bbox_list]
+
+    def update_template_ema(
+        self, frame_rgb: np.ndarray, bbox, alpha: float = 0.05
+    ) -> None:
+        """Exponential moving average template update.
+
+        Blends the current frame patch into the TRT z_tensor buffer with
+        weight *alpha* (new frame weight).  Low alpha = slow/stable update.
+        Called on accepted high-confidence frames so the template gradually
+        adapts without a hard reinit.
+        """
+        if not self.initialized:
+            return
+        bbox_list = bbox.tolist() if isinstance(bbox, np.ndarray) else list(bbox)
+        z_patch, _, _ = _sample_target(
+            frame_rgb, bbox_list, self.template_factor, self.template_size
+        )
+        patch_f32 = z_patch.astype(np.float32)
+        if self._ema_patch_f32 is None:
+            self._ema_patch_f32 = patch_f32.copy()
+        else:
+            self._ema_patch_f32 = alpha * patch_f32 + (1.0 - alpha) * self._ema_patch_f32
+        blended = np.clip(self._ema_patch_f32, 0.0, 255.0).astype(np.uint8)
+        self._z_tensor = _preprocess(blended)
 
     def _run_search(self, frame):
         """Run one search pass without mutating the current state."""

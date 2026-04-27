@@ -387,11 +387,30 @@ void IMMFilter::combine_estimates() noexcept {
 
 const StateVec& IMMFilter::predict() noexcept {
     if (initialized_) {
+        // Dynamic Q: boost all model Qs when AR changed sharply since last update.
+        // Detects target roll/bank (aspect ratio change) and widens process noise
+        // for this one predict cycle, then restores baseline Q.
+        float ar_boost = 1.0F;
+        if (ar_q_sensitivity_ > 0.0F && prev_meas_ar_ > 0.0F) {
+            const float h = x_combined_(3);
+            const float curr_ar = (h > 0.5F) ? (x_combined_(2) / h) : prev_meas_ar_;
+            const float ar_diff = std::abs(curr_ar - prev_meas_ar_);
+            ar_boost = std::min(1.0F + ar_diff * ar_q_sensitivity_, ar_q_boost_cap_);
+        }
+        const bool apply_ar_boost = (ar_boost > 1.001F);
+        if (apply_ar_boost) {
+            for (int32_t i = 0; i < kNumModels; ++i) { Q_[i] *= ar_boost; }
+        }
+
         compute_mixing_probabilities();
         mix_states();
         predict_all();
         combine_estimates();
         predicted_ = true;
+
+        if (apply_ar_boost) {
+            for (int32_t i = 0; i < kNumModels; ++i) { Q_[i] /= ar_boost; }
+        }
     }
     return x_combined_;
 }
@@ -425,6 +444,11 @@ const StateVec& IMMFilter::update(const MeasVec& z) noexcept {
 
         // Step 7: Combine estimates
         combine_estimates();
+
+        // Track AR from measurement for dynamic Q on next predict().
+        if (ar_q_sensitivity_ > 0.0F && z(3) > 0.5F) {
+            prev_meas_ar_ = z(2) / z(3);
+        }
     }
     return x_combined_;
 }
@@ -437,6 +461,24 @@ void IMMFilter::reset() noexcept {
     initialized_ = false;
     predicted_ = false;
     build_matrices();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Public: restore_from (ORU re-update entry point)
+// ─────────────────────────────────────────────────────────────────
+
+void IMMFilter::restore_from(const StateVec& x,
+                             const StateMat& P,
+                             const ModelProb& mu) noexcept {
+    for (int32_t m = 0; m < kNumModels; ++m) {
+        x_[m] = x;
+        P_[m] = P;
+    }
+    mu_         = mu;
+    x_combined_ = x;
+    P_combined_ = P;
+    initialized_ = true;
+    predicted_   = false;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -505,10 +547,15 @@ const StateVec& IMMFilter::update(const MeasVec& z, float confidence) noexcept {
         return update(z);
     }
 
-    const float eff_conf = std::max(confidence, adaptive_r_floor_);
+    // Use 0.001F as minimum to avoid division-by-zero; floor is now the neutral point
+    // (multiplier=1.0 when conf==floor), not a clamp floor. Allows R inflation for conf < floor.
+    const float eff_conf = std::max(confidence, 0.001F);
 
     const MeasCovMat R_saved = R_;
-    R_ = R_saved * (adaptive_r_floor_ / eff_conf);
+    // D2A: cap R inflation to prevent unbounded noise at very low confidence.
+    // multiplier = min(floor/conf, cap); floor acts as neutral point, cap bounds explosion.
+    const float multiplier = std::min(adaptive_r_floor_ / eff_conf, adaptive_r_cap_);
+    R_ = R_saved * multiplier;
     static_cast<void>(update(z));
     R_ = R_saved;
 
@@ -535,6 +582,15 @@ void IMMFilter::set_gmc_q_boost(float boost) noexcept {
 
 void IMMFilter::set_adaptive_r_floor(float floor) noexcept {
     if (floor > 0.0F && floor <= 1.0F) { adaptive_r_floor_ = floor; }
+}
+
+void IMMFilter::set_adaptive_r_cap(float cap) noexcept {
+    if (cap > 1.0F) { adaptive_r_cap_ = cap; }  // cap < 1 makes no physical sense
+}
+
+void IMMFilter::set_ar_q_sensitivity(float sensitivity, float boost_cap) noexcept {
+    if (sensitivity >= 0.0F) { ar_q_sensitivity_ = sensitivity; }
+    if (boost_cap > 1.0F)    { ar_q_boost_cap_   = boost_cap;   }
 }
 
 // ─────────────────────────────────────────────────────────────────

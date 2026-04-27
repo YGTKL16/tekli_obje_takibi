@@ -1,0 +1,83 @@
+# I1: Revert Singer to safe non-UAV values
+#
+# Problem (confirmed by kaizen_submission2.log, 255-seq eval):
+#   h3_singer_uav.yaml: FinalScore(raw)=0.7116, FinalScore(IMM)=0.6550 → Δ=−0.0566
+#   IMM worse on 110/255 sequences; better on only 51/255.
+#
+# Root cause: Singer α=3.0 was tuned for UAV (9% of dataset).
+#   α=3.0 → τ=0.33 frame → interprets normal human gait jitter as aggressive maneuver
+#   → Q inflates → KF velocity/acceleration diverge → predicted state drifts
+#   → Faz D init() or Great Rescue fires at wrong KF position → template corrupted → cascade
+#   Evidence: tennis_player1_1 raw=0.829→imm=0.142 (−0.687), hiker2 raw=0.835→imm=0.144 (−0.691)
+#   These sequences have HIGH raw AUC — AI works fine; IMM destroys them.
+#
+# Fix: revert Singer to α=1.0, σ²_a=25.0 (τ=1 frame, proven safe on full dataset).
+#   All other parameters identical to h3_singer_uav.yaml (Optuna-tuned values kept).
+#
+# Baseline: raw FinalScore=0.7116 (target: IMM ≥ 0.7116)
+# h3 IMM:   FinalScore(IMM)=0.6550
+# Expected gain: ~47 sequences recover from dAUC < −0.10
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786   # measurement noise position; range [1, 100]
+    r_size_scale: 2.107025   # measurement noise size; range [0.1, 20]
+  transition_matrix:
+    pi_persist: 0.9600       # IMM model self-persistence; range [0.80, 0.99]
+
+decision:
+  conf_threshold: 0.186309   # minimum conf to accept AI measurement; range [0.05, 0.5]
+  coast_threshold: 0.140301  # below this: coast (blind flight); range [0.01, 0.3]
+  max_coast_frames: 44       # max frames to coast before fallback; range [5, 100]
+
+blend:
+  alpha_conf_lo: 0.373544    # blend weight lower bound; range [0, 0.5]
+  alpha_conf_hi: 0.845429    # blend weight upper bound; range [0.5, 1.0]
+
+hygiene:
+  reinit_after: 10           # KF reinit after N consecutive rejections; range [5, 30]
+  max_area_frac: 0.345940    # max bbox area as fraction of frame; range [0.1, 0.5]
+  max_center_jump_frac: 0.511044  # max center jump as fraction of diagonal; range [0.1, 1.0]
+  aspect_ratio_lo: 0.1       # min w/h; range [0.05, 0.3]
+  aspect_ratio_hi: 7.099779  # max w/h; range [3.0, 10.0]
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469  # conf >= this → bypass gates, trust AI directly; range [0.5, 0.95]
+  innovation_threshold: 1.454772   # innovation norm above this → Q-boost next frame; range [0.5, 5.0]
+  sm_conf_threshold: 0.155357      # TrackerState confidence gate; range [0.05, 0.3]
+  sm_max_coast: 69                 # TrackerState max coast frames; range [10, 120]
+  maneuver_threshold: 0.40         # IMM p_maneuver above this → lower bypass_thr; range [0.2, 0.8]
+  maneuver_bypass_boost: 0.10      # bypass_thr reduction when maneuver detected; range [0.0, 0.3]
+
+adaptive_r:
+  enabled: true
+  floor: 0.01          # min effective confidence for R scaling; range [0.001, 0.2]
+  r_exponent: 2.0      # R ∝ 1/conf^n; range [1.0, 3.0]
+
+singer:
+  # I1: reverted to safe non-UAV values.
+  # α=1.0 → τ=1 frame — maneuver correlation decays over 1 frame (proven safe on person/vehicle)
+  # α=3.0 (h3) caused catastrophic failure on person/group sequences (see header).
+  # σ²_a=25.0 → std dev 5 px/frame² — conservative; enough for vehicles and pedestrians.
+  alpha: 1.0        # 1/τ; range (0, 20]. UAV: 2-5, person/vehicle: 0.5-1.5. was 3.0 in h3.
+  sigma2_a: 25.0    # px²/frame⁴; range (0, 500]. was 100.0 in h3.
+
+mahalanobis:
+  chi2_threshold: 23.51    # χ²(4 dof) gate; range [7.78, 23.51]. 23.51 = p=1e-4 (permissive)
+  bypass_after: 2          # skip gate when reject_streak >= N; range [1, 10]
+  r_pos_base: 44.953786    # = r_pos_scale × 1.0 (keep in sync with measurement_noise)
+  r_size_base: 21.07025    # = r_size_scale × 10.0 (keep in sync with measurement_noise)
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35    # Singer prob above this → always run AI; range [0.2, 0.6]
+  cv_stable_thr: 0.70      # CV prob above this → allow skip (skip_when_confident=false → unused)
+  cv_conf_min: 0.65        # min conf to allow AI skip; range [0.4, 0.9]
+  search_scale_boost: 0.0  # REJECT permanently — corrupts AI template size
+  conf_refresh_low:   0.35  # Faz D: lower bound of moderate-conf zone; range [0.2, 0.5]
+  conf_refresh_high:  0.65  # Faz D: upper bound of moderate-conf zone; range [0.5, 0.8]
+  refresh_patience:   8     # Faz D: consecutive frames before refresh fires; range [3, 20]
+  refresh_decline_thr: 0.04 # Faz D: conf must drop >= this from streak start; range [0.01, 0.15]
+  refresh_bypass_lookback: 30  # B gate: block Faz D if bypass fired within N frames; range [0, 60]

@@ -1,0 +1,112 @@
+# K3: Soft R — Quadratic Panic Söndürme
+#
+# Kaizen Trial | 2026-04-26 | Baseline: k2_staggered_rescue.yaml IMM=0.6890 (20-seq)
+#
+# Sorun (Döngü 2 — Güven Çöküşü Döngüsü):
+#   r_exponent=2.0 → R_eff = R_base / max(conf^2, 0.01)
+#   conf=0.20 → R_eff = R_base / 0.04 = 25 × R_base  (KF AI'ı neredeyse ignore ediyor)
+#   conf=0.10 → R_eff = R_base / 0.01 = 100 × R_base (patlayıcı: floor=0.01 sabit tutar)
+#   Güven %80'den %20'ye düştüğünde R 400:1 aralığında değişiyor → kırılgan.
+#
+# Çözüm: r_exponent: 1.5 + floor: 0.05 → "şüpheci ama dinleyici"
+#   R_eff = R_base / max(conf^1.5, 0.05)
+#
+#   conf karşılaştırması (R katsayısı):
+#   conf   exp=2.0 (mevcut)   exp=1.5 (yeni)   değişim
+#   0.10   100 × R_base        31.6 × R_base    −68%
+#   0.20    25 × R_base        11.2 × R_base    −55%
+#   0.50     4 × R_base         2.83 × R_base   −29%
+#   0.80     1.56 × R_base      1.40 × R_base   −10%
+#   floor katkısı: conf < 0.224 → R tavan = R_base/0.05 = 20 × R_base (sabit)
+#
+# Riskler:
+#   - Düşük conf'ta daha fazla AI ölçümü KF'ye giriyor → ID-switch risk artabilir
+#   - Bypass mekanizması (conf≥0.74 direct AI bypass) bu değişiklikten etkilenmiyor
+#   - Doğrula: car8, wakeboard5 (ID-switch riskli), truck1 (conf-zayıf düzelir?)
+#
+# Kök: k2_staggered_rescue.yaml üzerine kurulu (rescue kademelendirmesi korunur)
+#
+# Test: python3 scripts/ab_test.py --mode ai_lead --gmc --adaptive-r \
+#          --imm-config configs/k3_soft_r.yaml
+# KABUL kriteri: Δ ≥ 0.0 vs k2 baseline; regresyon: hiçbir sek. −0.05'den kötü değil
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+  rescue_streak_threshold: 10   # k2: Stratejik kademelendirme — bypass(5) önce, rescue(10) sonra
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.05         # MUTATION: was 0.01 → conf<0.224'te R tavan sabit 20×R_base
+                      # Geçerli aralık: [0.01, 0.30]. 0.01=patlayıcı, 0.30=çok toleranslı
+  r_exponent: 1.5     # MUTATION: was 2.0 → R ∝ 1/conf^1.5 (kuadratik panic → doğrusal-benzeri)
+                      # Geçerli aralık: [1.0, 3.0]. 1.0=çok yumuşak, 3.0=çok sert
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+
+  # i11: Smart Cooldown
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+
+  # i12: Great Rescue Area Gate
+  rescue_min_area: 220.0
+
+  # F5: Closed-loop feedback
+  f5_feedback: true

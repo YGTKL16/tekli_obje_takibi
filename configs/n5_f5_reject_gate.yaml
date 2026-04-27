@@ -1,0 +1,107 @@
+# N5: F5 Rolling-Reject Gate
+#
+# Kaizen Trial | 2026 | Baseline: i12 IMM=0.7139 (255-seq)
+#
+# Problem:
+#   i12 f5_feedback fires on ALL frames, causing:
+#   - car6/building2 regressions (~-0.021, -0.013) via KF size-lag on stable targets
+#   - truck_night/aircon_box2 gains (~+0.161, +0.223) via position anchor during tracking
+#
+#   n4 (f5_coast_only) was too coarse: kills truck_night/aircon gains completely.
+#
+# Better idea: f5_reject_window gate
+#   Gate f5 on LOCAL reject rate: only fire when >= f5_reject_min_count rejects
+#   have occurred in the last f5_reject_window frames.
+#
+#   Adaptive per-sequence behaviour:
+#   - car6 (~13% local reject rate): rarely fires → no KF size-lag regression
+#   - building2 (~17% local reject rate): rarely fires → no regression
+#   - truck_night (~87% local reject rate): almost always fires → benefit preserved
+#   - aircon_box2 (~85% local reject rate): almost always fires → benefit preserved
+#
+# Parameters:
+#   f5_reject_window=10 (lookback window)
+#   f5_reject_min_count=3 (≥3/10 = 30% reject rate triggers f5)
+#
+#   threshold at 30%: car6 expects ~1.3/10, building2 ~1.65/10 → rarely ≥3
+#                     truck_night expects ~8.7/10, aircon_box2 ~8.5/10 → almost always ≥3
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  coast_threshold: 0.140301
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  mahal_chi2_threshold: 23.51
+  r_exponent: 2.0
+  adaptive_r: true
+
+regime_adaptive: false
+
+gmc:
+  enabled: false
+  method: ecc
+  min_inliers: 20
+  max_rot_deg: 3.0
+
+ai:
+  kf_mode: ai_lead
+  search_scale_boost: 0.0
+  maneuver_pi_enabled: false
+  refresh_patience: 8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  f5_feedback: true
+  f5_scale_guard: 1.5
+  # N5: Rolling-reject gate — f5 only fires when recent local reject rate is high
+  # f5_reject_window frames lookback, require >= f5_reject_min_count rejects
+  f5_reject_window: 10
+  f5_reject_min_count: 3
+
+oru:
+  enabled: true
+  n_min: 5
+  n_max: 30
+  conf_reentry_min: 0.50
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+  skip_if_singer_dom: true
+  singer_dom_thr: 0.7
+  ring_buffer_size: 35
+
+chaos:
+  enabled: false
+  window: 10
+  chaos_thr: 0.08
+  chaos_max: 0.20
+  min_chaos_conf_factor: 0.15

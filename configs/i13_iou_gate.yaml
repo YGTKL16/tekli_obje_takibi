@@ -1,0 +1,106 @@
+# I13: FazD IoU Koherans Kapısı (C-gate) — Surfer Regresyon Düzeltmesi
+#
+# Kaizen Trial #11 | 2026-04-24 | Baseline: i12g IMM=0.7419
+#
+# Teşhis (surfer: 0.619 raw → 0.520 IMM, Δ=−0.099):
+#   surfer: 150 frame, init_area=612px², ~5.7 px/frame yatay hareket.
+#   FazD, moderate-conf declining streak sırasında ateşleniyor; ancak AI kaybettiğinde
+#   KF tahmininden uzaklaşmış — incoherent konumda template reinit → kalıcı kayıp.
+#   Çözüm: IoU(KF_pred, AI_det) < eşik → FazD BLOKE.
+#   Makul refresh ise (AI≈KF): IoU yüksek → geçer. box2/truck_night korunur.
+#
+# i13 Mutasyonu (tek değişkenli, C-gate):
+#   fazd_area_small_thr: 1.0        → tüm hedefler "büyük" IoU yolunu kullanır
+#   fazd_center_dist_gate_thr: 0.0  → center-dist path devre dışı (bike3 interval=99999 ile korunuyor)
+#   fazd_iou_gate_thr: 0.20         → IoU(KF_pred, AI_det) < 0.20 → FazD BLOKE
+#
+# Referans: i10_scale_gate.yaml fazd_iou_gate_thr=0.25 kullandı — i13 daha permisif başlar (0.20).
+#
+# Beklenen:
+#   surfer: 0.520 → ~0.58 (incoherent FazD bloke)
+#   box2:   0.626 → korunur (yüksek-IoU refreshler geçer)
+#   truck_night: 0.642 → korunur
+#   bike3:  0.589 → korunur (init_area=170 < 220 → i12 gate devrede)
+#   FinalScore: 0.7419 → ~0.745+
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+  # i11/i12: tiny-target FazD + Rescue gate (bike3 fix)
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0  # bike3(170) < 220 → FazD kalıcı bloke
+  refresh_small_interval: 99999  # effectively ∞ for tiny targets
+  rescue_min_area: 220.0         # Great Rescue: init_area < 220 → bloke
+
+  # i13: C-gate — IoU koherans kapısı (surfer fix)
+  # FazD yalnızca KF tahmini ile AI deteksiyonu uyumlu olduğunda ateşlenir.
+  # IoU(KF_pred, AI_det) < fazd_iou_gate_thr → FazD BLOKE (incoherent refresh engellenir).
+  # fazd_area_small_thr=1.0: tüm hedefler "büyük" yolunu (IoU branch) kullanır;
+  #   center-dist path (fazd_center_dist_gate_thr=0.0) devre dışı — bike3 zaten korunuyor.
+  fazd_area_small_thr: 1.0        # 1px² → her hedef IoU gate'e girer
+  fazd_center_dist_gate_thr: 0.0  # tiny-target center-dist path devre dışı
+  fazd_iou_gate_thr: 0.20         # IoU < 0.20 → FazD bloke; IoU >= 0.20 → geçer

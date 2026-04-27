@@ -53,8 +53,8 @@ adaptive_r:
   r_exponent: 2.0
 
 singer:
-  alpha: 1.0
-  sigma2_a: 25.0
+  alpha: 3.0        # H3-inherited: UAV-tuned (was 1.0)
+  sigma2_a: 100.0   # H3-inherited: was 25.0
 
 mahalanobis:
   chi2_threshold: 23.51

@@ -171,10 +171,13 @@ const StateVec& KalmanFilter::update(const MeasVec& z, float confidence) noexcep
         return update(z);
     }
 
-    const float eff_conf = std::max(confidence, adaptive_r_floor_);
+    // Use 0.001F as minimum to avoid division-by-zero; floor is now the neutral point
+    // (multiplier=1.0 when conf==floor), not a clamp floor. Allows R inflation for conf < floor.
+    const float eff_conf = std::max(confidence, 0.001F);
 
     const MeasCovMat R_saved = R_;
-    R_ = R_saved * (adaptive_r_floor_ / eff_conf);
+    const float multiplier = std::min(adaptive_r_floor_ / eff_conf, adaptive_r_cap_);
+    R_ = R_saved * multiplier;
     static_cast<void>(update(z));
     R_ = R_saved;
 
@@ -223,6 +226,10 @@ void KalmanFilter::set_gmc_q_boost(float boost) noexcept {
 void KalmanFilter::set_adaptive_r_floor(float floor) noexcept {
     // Clamp to (0, 1] — confidence is a probability.
     if (floor > 0.0F && floor <= 1.0F) { adaptive_r_floor_ = floor; }
+}
+
+void KalmanFilter::set_adaptive_r_cap(float cap) noexcept {
+    if (cap > 1.0F) { adaptive_r_cap_ = cap; }
 }
 
 void KalmanFilter::reset() noexcept {

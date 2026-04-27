@@ -1,0 +1,95 @@
+# I11b: Smart Cooldown + Startup Grace Period fix
+#
+# Kaizen Trial #8b | 2026-04-24 | Baseline: i9c IMM=0.7195
+#
+# Root Cause Analysis (why i11a gave Δ=0):
+#   _last_refresh_frame was initialized to -99999.
+#   _frame_count - (-99999) >> any interval from frame 1.
+#   → First (catastrophic) refresh had ZERO cooldown protection.
+#   → Cooldown only blocked refreshes #2, #3, etc. — too late.
+#
+# Fix Applied (pipeline.py):
+#   _last_refresh_frame = 0  (not -99999)
+#   → startup grace period = refresh_small_interval frames from sequence start
+#   → For bike3 (small): no refresh until frame 90+; disaster was at ~frame 100+
+#
+# Also: increased refresh_small_interval: 90 → 120 (4 sec @ 30fps)
+# to further push the first refresh past the early-frame trap zone.
+#
+# Small target strategy:
+#   bike3 area ≈ 7×7 = 49 px² < 400 → uses small_interval = 120
+#   surfer area >> 400 → uses min_interval = 60 (global)
+#
+# Expected: bike3 first refresh delayed to frame 120+ → KF/Singer stays on target
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+  # i11b: Smart Cooldown with Startup Grace Period
+  refresh_min_bbox_area: 0.0    # hard-block disabled (use interval instead)
+  refresh_min_interval: 60      # global cooldown (applies to surfer, medium targets)
+  refresh_small_area_thr: 400.0 # px²: targets < 20×20 use the extended cooldown
+  refresh_small_interval: 120   # 4 sec @ 30fps: pushes first refresh past early danger zone

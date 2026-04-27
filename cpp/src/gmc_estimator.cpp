@@ -81,8 +81,20 @@ bool GMCEstimator::estimate(
     const float    fg_xywh[4],
     HomMat&        H_out
 ) {
+    GMCEstimateStats stats{};
+    return estimate_with_stats(prev_gray, curr_gray, fg_xywh, H_out, stats);
+}
+
+bool GMCEstimator::estimate_with_stats(
+    const cv::Mat&    prev_gray,
+    const cv::Mat&    curr_gray,
+    const float       fg_xywh[4],
+    HomMat&           H_out,
+    GMCEstimateStats& stats_out
+) {
     // Default to identity — caller checks return value for Q-boost decision.
     H_out.setIdentity();
+    stats_out = GMCEstimateStats{};
 
     if (prev_gray.empty() || curr_gray.empty()) {
         return false;
@@ -128,8 +140,9 @@ bool GMCEstimator::estimate(
     // ── Match ───────────────────────────────────────────────────
     matches_.clear();
     matcher_->match(desc_prev_, desc_curr_, matches_);
+    stats_out.match_count = static_cast<int32_t>(matches_.size());
 
-    if (static_cast<int32_t>(matches_.size()) < min_matches_) {
+    if (stats_out.match_count < min_matches_) {
         return false;
     }
 
@@ -152,15 +165,11 @@ bool GMCEstimator::estimate(
         return false;
     }
 
-    const int32_t inliers = cv::countNonZero(inlier_mask_);
-    if (inliers < min_matches_) {
-        return false;
-    }
-
-    const float inlier_ratio =
-        static_cast<float>(inliers) / static_cast<float>(matches_.size());
-    if (inlier_ratio < inlier_ratio_thresh_) {
-        return false;
+    stats_out.has_affine = true;
+    stats_out.inlier_count = cv::countNonZero(inlier_mask_);
+    if (stats_out.match_count > 0) {
+        stats_out.inlier_ratio =
+            static_cast<float>(stats_out.inlier_count) / static_cast<float>(stats_out.match_count);
     }
 
     // ── Build 3×3 from 2×3 affine, then undo downscale ─────────
@@ -184,6 +193,12 @@ bool GMCEstimator::estimate(
     }
 
     H_out = H_s;
+    if (stats_out.inlier_count < min_matches_) {
+        return false;
+    }
+    if (stats_out.inlier_ratio < inlier_ratio_thresh_) {
+        return false;
+    }
     return true;
 }
 

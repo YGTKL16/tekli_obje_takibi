@@ -60,6 +60,9 @@ public:
     /// Set confidence floor for adaptive R (default 0.4).
     void set_adaptive_r_floor(float floor) noexcept;
 
+    /// Maximum R multiplier vs baseline for adaptive R (default 10.0).
+    void set_adaptive_r_cap(float cap) noexcept;
+
     /// @return Current state estimate [x, y, w, h, vx, vy, vw, vh, ax, ay].
     [[nodiscard]] const StateVec& get_state() const noexcept { return x_; }
 
@@ -99,6 +102,7 @@ private:
     bool  gmc_failed_       = false;   ///< flag consumed by next predict()
     float gmc_q_boost_      = 4.0F;    ///< Q multiplier when GMC failed
     float adaptive_r_floor_ = 0.4F;    ///< lower bound on confidence for R scale
+    float adaptive_r_cap_   = 10.0F;   ///< max R multiplier (D2A)
 
 #ifdef TRACKER_RUST_BRIDGE_ENABLED
     float frame_width_  = 1920.0F;

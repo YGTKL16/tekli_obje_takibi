@@ -26,10 +26,25 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     "sm_max_coast": 30,
     "adaptive_r_enabled": False,
     "adaptive_r_floor": 0.4,
+    "adaptive_r_cap": 10.0,
     "gmc_enabled": False,
     "gmc_n_features": 200,
+    "gmc_quality_enabled": True,
+    "gmc_veto_inlier_ratio": 0.2,
+    "gmc_borderline_inlier_ratio": 0.3,
+    "gmc_max_translation_frac_diag": 0.08,
+    "gmc_max_rotation_deg": 12.0,
+    "gmc_history_window": 5,
+    "gmc_history_outlier_mult": 3.0,
+    "gmc_freeze_maneuver_on_veto": True,
+    "gmc_freeze_frames_after_veto": 1,
+    # D3: dual GMC
+    "gmc_n_features_high": 0,          # 0 = disabled; try 600
+    "gmc_rot_thr_deg": 3.0,            # rotation angle to trigger high-feature mode
+    "gmc_high_feature_frames": 8,      # frames to stay in high-feature mode
     "gmc_inlier_ratio_threshold": 0.3,
     "gmc_min_matches": 6,
+    "gmc_ransac_reproj_threshold": 3.0,
     "gmc_downsample": 0.5,
     "gmc_fail_q_boost": 4.0,
     "gmc_foreground_dilate_factor": 1.4,
@@ -68,6 +83,46 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     # 0 = disabled. Blocks refreshes on small targets (e.g. bike: ~164 px²)
     # while keeping them for large targets (e.g. truck: ~2000 px²).
     "refresh_min_bbox_area": 0.0,
+    # I3: Size-velocity gate. 0 = disabled. Blocks Faz D when |vw|+|vh| > threshold.
+    "refresh_scale_vel_max": 0.0,
+    # D1: IMM maneuver detector — dynamic pi injection on Mahalanobis spike
+    "maneuver_pi_enabled": False,
+    "maneuver_pi_thr": 16.0,
+    "maneuver_pi_persist": 0.72,
+    "maneuver_pi_singer_boost": 0.20,
+    "normal_pi_persist": 0.96,
+    # D2B: velocity anchor — max px/frame allowed in coast search window (0 = disabled)
+    "velocity_anchor_max": 0.0,
+    # D5: ReID-gated rescue
+    "reid_enabled": False,
+    "reid_sim_threshold": 0.70,
+    "reid_maxlen": 50,
+    # ROI CLAHE: contrast enhancement in search region (false = disabled)
+    "clahe_enabled": False,
+    "clahe_clip_limit": 2.0,   # CLAHE clip limit [0.5, 8.0]
+    "clahe_roi_scale": 3.0,    # ROI expansion factor around predicted bbox [1.5, 6.0]
+    "clahe_tile_size": 8,      # tile grid size (NxN) [4, 16]
+    # F8-guard: cap w/h in F5 set_state to init_w/h * f5_scale_guard (0.0 = disabled)
+    "f5_scale_guard": 0.0,
+    # Dynamic Q from AR rate (0.0 = disabled)
+    "ar_q_sensitivity": 0.0,   # q_boost = 1 + |delta_AR| * sensitivity [0, 30]
+    "ar_q_boost_cap": 3.0,     # max Q multiplier per frame [1.5, 8.0]
+    # Velocity direction gate: reject 180° ID-switch detections (0 = disabled)
+    "vel_gate_min_speed": 0.0,  # min KF speed px/frame to arm gate [2, 20]
+    "vel_gate_cos_thr": 0.5,    # reject when cos(angle) < -thr (>120°) [0.3, 0.8]
+    # Velocity-relative innovation gate: force coast when center_innov / kf_speed > thr
+    # 0 = disabled.  Fires only in normal (non-bypass) path to block ID-switch on
+    # stationary targets (truck_night style).
+    "vel_innov_ratio_gate": 0.0,  # ratio threshold; 0 = disabled
+    "vel_innov_min_speed": 1.0,   # floor for kf_speed denominator (px/frame)
+    "vel_innov_min_innov": 0.0,   # minimum absolute center innov (px) to fire gate; 0=no min
+    "accept_bbox_raw": False,     # output raw AI obs (not KF state) on accepted frames
+    "f5_obs_size": False,         # f5 feedback uses AI obs size + KF position (fixes size-lag)
+    "f5_coast_only": False,       # f5 feedback only fires during coasting (reject_streak > 0)
+    # ORU backfill: raw sub-dict forwarded to OruConfig.from_dict() (empty = defaults)
+    "oru_config": {},
+    # Chaos trigger: raw sub-dict forwarded to ChaosConfig.from_dict() (empty = disabled)
+    "chaos_config": {},
 }
 
 
@@ -216,6 +271,16 @@ def normalize_runtime_config(
     if adaptive_r_floor is not None:
         params["adaptive_r_floor"] = float(adaptive_r_floor)
 
+    # D2A: R inflation cap
+    adaptive_r_cap = adaptive_r.get("cap")
+    if adaptive_r_cap is not None:
+        params["adaptive_r_cap"] = float(adaptive_r_cap)
+
+    # D2B: velocity anchor
+    velocity_anchor_max = adaptive_r.get("velocity_anchor_max")
+    if velocity_anchor_max is not None:
+        params["velocity_anchor_max"] = float(velocity_anchor_max)
+
     # Phase 2: dynamic R exponent
     r_exponent = adaptive_r.get("r_exponent")
     if r_exponent is not None:
@@ -232,6 +297,20 @@ def normalize_runtime_config(
     r_size_base_ = mahal.get("r_size_base")
     if r_size_base_ is not None:
         params["r_size_base"] = float(r_size_base_)
+    mahal_bypass_after_ = mahal.get("bypass_after")
+    if mahal_bypass_after_ is not None:
+        params["mahal_bypass_after"] = int(mahal_bypass_after_)
+
+    # Dynamic bypass: confidence + velocity based adaptive mahal_bypass_after
+    for _k, _conv in (
+        ("bypass_conf_thr",   float),
+        ("bypass_vel_thr",    float),
+        ("bypass_after_fast", int),
+        ("bypass_after_slow", int),
+    ):
+        _v = mahal.get(_k)
+        if _v is not None:
+            params[f"mahal_{_k}"] = _conv(_v)
 
     # Phase 4: IMM manoeuvre-probability bypass boost
     maneuver_threshold = smart.get("maneuver_threshold")
@@ -256,6 +335,34 @@ def normalize_runtime_config(
     if gmc_n_features is not None:
         params["gmc_n_features"] = int(gmc_n_features)
 
+    v = gmc.get("quality_enabled")
+    if v is not None:
+        params["gmc_quality_enabled"] = bool(v)
+    v = gmc.get("veto_inlier_ratio")
+    if v is not None:
+        params["gmc_veto_inlier_ratio"] = float(v)
+    v = gmc.get("borderline_inlier_ratio")
+    if v is not None:
+        params["gmc_borderline_inlier_ratio"] = float(v)
+    v = gmc.get("max_translation_frac_diag")
+    if v is not None:
+        params["gmc_max_translation_frac_diag"] = float(v)
+    v = gmc.get("max_rotation_deg")
+    if v is not None:
+        params["gmc_max_rotation_deg"] = float(v)
+    v = gmc.get("history_window")
+    if v is not None:
+        params["gmc_history_window"] = int(v)
+    v = gmc.get("history_outlier_mult")
+    if v is not None:
+        params["gmc_history_outlier_mult"] = float(v)
+    v = gmc.get("freeze_maneuver_on_veto")
+    if v is not None:
+        params["gmc_freeze_maneuver_on_veto"] = bool(v)
+    v = gmc.get("freeze_frames_after_veto")
+    if v is not None:
+        params["gmc_freeze_frames_after_veto"] = int(v)
+
     gmc_inlier_ratio_threshold = gmc.get("inlier_ratio_threshold")
     if gmc_inlier_ratio_threshold is not None:
         params["gmc_inlier_ratio_threshold"] = float(gmc_inlier_ratio_threshold)
@@ -263,6 +370,10 @@ def normalize_runtime_config(
     gmc_min_matches = gmc.get("min_matches")
     if gmc_min_matches is not None:
         params["gmc_min_matches"] = int(gmc_min_matches)
+
+    gmc_ransac_reproj_threshold = gmc.get("ransac_reproj_threshold")
+    if gmc_ransac_reproj_threshold is not None:
+        params["gmc_ransac_reproj_threshold"] = float(gmc_ransac_reproj_threshold)
 
     gmc_downsample = gmc.get("downsample")
     if gmc_downsample is not None:
@@ -275,6 +386,17 @@ def normalize_runtime_config(
     gmc_foreground_dilate_factor = gmc.get("foreground_dilate_factor")
     if gmc_foreground_dilate_factor is not None:
         params["gmc_foreground_dilate_factor"] = float(gmc_foreground_dilate_factor)
+
+    # D3: dual GMC params
+    v = gmc.get("n_features_high")
+    if v is not None:
+        params["gmc_n_features_high"] = int(v)
+    v = gmc.get("rot_thr_deg")
+    if v is not None:
+        params["gmc_rot_thr_deg"] = float(v)
+    v = gmc.get("high_feature_frames")
+    if v is not None:
+        params["gmc_high_feature_frames"] = int(v)
 
     association_enabled = association.get("enabled")
     if association_enabled is not None:
@@ -344,6 +466,60 @@ def normalize_runtime_config(
     if refresh_min_bbox_area is not None:
         params["refresh_min_bbox_area"] = float(refresh_min_bbox_area)
 
+    refresh_scale_vel_max = ai.get("refresh_scale_vel_max")
+    if refresh_scale_vel_max is not None:
+        params["refresh_scale_vel_max"] = float(refresh_scale_vel_max)
+
+    # i11: Smart Cooldown — minimum interval between template re-inits.
+    refresh_min_interval = ai.get("refresh_min_interval")
+    if refresh_min_interval is not None:
+        params["refresh_min_interval"] = int(refresh_min_interval)
+
+    refresh_small_area_thr = ai.get("refresh_small_area_thr")
+    if refresh_small_area_thr is not None:
+        params["refresh_small_area_thr"] = float(refresh_small_area_thr)
+
+    refresh_small_interval = ai.get("refresh_small_interval")
+    if refresh_small_interval is not None:
+        params["refresh_small_interval"] = int(refresh_small_interval)
+
+    # i12: Great Rescue boyut barajı — parsed from ai: block
+    rescue_min_area = ai.get("rescue_min_area")
+    if rescue_min_area is not None:
+        params["rescue_min_area"] = float(rescue_min_area)
+
+    # F5: Closed-loop feedback — per-frame tracker.set_state(kf_output)
+    f5_feedback_v = ai.get("f5_feedback")
+    if f5_feedback_v is not None:
+        params["f5_feedback"] = bool(f5_feedback_v)
+
+    f5_scale_guard_v = ai.get("f5_scale_guard")
+    if f5_scale_guard_v is not None:
+        params["f5_scale_guard"] = float(f5_scale_guard_v)
+
+    # F5-ObsSize: use AI obs size + KF position in set_state (avoids KF size-lag)
+    f5_obs_size_v = ai.get("f5_obs_size")
+    if f5_obs_size_v is not None:
+        params["f5_obs_size"] = bool(f5_obs_size_v)
+
+    # F5-CoastOnly: only fire f5 during coasting (reject_streak > 0)
+    f5_coast_only_v = ai.get("f5_coast_only")
+    if f5_coast_only_v is not None:
+        params["f5_coast_only"] = bool(f5_coast_only_v)
+
+    # N5: f5 rolling-reject gate
+    f5_reject_window_v = ai.get("f5_reject_window")
+    if f5_reject_window_v is not None:
+        params["f5_reject_window"] = int(f5_reject_window_v)
+    f5_reject_min_count_v = ai.get("f5_reject_min_count")
+    if f5_reject_min_count_v is not None:
+        params["f5_reject_min_count"] = int(f5_reject_min_count_v)
+
+    # N7: f5 position-only — use KF position + last_good_bbox size
+    f5_pos_only_v = ai.get("f5_pos_only")
+    if f5_pos_only_v is not None:
+        params["f5_pos_only"] = bool(f5_pos_only_v)
+
     # IMM physics params — extracted from nested imm: block in imm_tuned.yaml.
     imm_block = _as_mapping(cfg.get("imm"))
     q_scale_v = imm_block.get("q_scale")
@@ -360,6 +536,100 @@ def normalize_runtime_config(
     pi_persist_v = tm_block.get("pi_persist")
     if pi_persist_v is not None:
         params["pi_persist"] = float(pi_persist_v)
+
+    # D1: maneuver detector sub-block
+    md_block = _as_mapping(imm_block.get("maneuver_detector"))
+    v = md_block.get("enabled")
+    if v is not None:
+        params["maneuver_pi_enabled"] = bool(v)
+    v = md_block.get("chi2_threshold")
+    if v is not None:
+        params["maneuver_pi_thr"] = float(v)
+    v = md_block.get("pi_persist")
+    if v is not None:
+        params["maneuver_pi_persist"] = float(v)
+    v = md_block.get("pi_singer_boost")
+    if v is not None:
+        params["maneuver_pi_singer_boost"] = float(v)
+    v = md_block.get("normal_pi_persist")
+    if v is not None:
+        params["normal_pi_persist"] = float(v)
+
+    # D5: ReID rescue
+    reid_block = _as_mapping(cfg.get("reid"))
+    v = reid_block.get("enabled")
+    if v is not None:
+        params["reid_enabled"] = bool(v)
+    v = reid_block.get("sim_threshold")
+    if v is not None:
+        params["reid_sim_threshold"] = float(v)
+    v = reid_block.get("maxlen")
+    if v is not None:
+        params["reid_maxlen"] = int(v)
+
+    # ROI CLAHE
+    clahe_block = _as_mapping(cfg.get("clahe"))
+    v = clahe_block.get("enabled")
+    if v is not None:
+        params["clahe_enabled"] = bool(v)
+    v = clahe_block.get("clip_limit")
+    if v is not None:
+        params["clahe_clip_limit"] = float(v)
+    v = clahe_block.get("roi_scale")
+    if v is not None:
+        params["clahe_roi_scale"] = float(v)
+    v = clahe_block.get("tile_size")
+    if v is not None:
+        params["clahe_tile_size"] = int(v)
+
+    # Dynamic Q from AR rate
+    singer_block = _as_mapping(cfg.get("singer"))
+    v = singer_block.get("ar_q_sensitivity")
+    if v is not None:
+        params["ar_q_sensitivity"] = float(v)
+    v = singer_block.get("ar_q_boost_cap")
+    if v is not None:
+        params["ar_q_boost_cap"] = float(v)
+
+    # Velocity direction gate
+    vel_gate = _as_mapping(cfg.get("vel_gate"))
+    v = vel_gate.get("min_speed")
+    if v is not None:
+        params["vel_gate_min_speed"] = float(v)
+    v = vel_gate.get("cos_thr")
+    if v is not None:
+        params["vel_gate_cos_thr"] = float(v)
+
+    # Velocity-relative innovation gate (vel_innov: block or top-level keys)
+    vel_innov_block = _as_mapping(cfg.get("vel_innov"))
+    v = _first_non_none(vel_innov_block.get("ratio_gate"), cfg.get("vel_innov_ratio_gate"))
+    if v is not None:
+        params["vel_innov_ratio_gate"] = float(v)
+    v = _first_non_none(vel_innov_block.get("min_speed"), cfg.get("vel_innov_min_speed"))
+    if v is not None:
+        params["vel_innov_min_speed"] = float(v)
+    v = _first_non_none(vel_innov_block.get("min_innov"), cfg.get("vel_innov_min_innov"))
+    if v is not None:
+        params["vel_innov_min_innov"] = float(v)
+    v = cfg.get("accept_bbox_raw")
+    if v is not None:
+        params["accept_bbox_raw"] = bool(v)
+    v = cfg.get("f5_obs_size")
+    if v is not None:
+        params["f5_obs_size"] = bool(v)
+    v = cfg.get("f5_coast_only")
+    if v is not None:
+        params["f5_coast_only"] = bool(v)
+
+    # ORU backfill — forward raw sub-dict; parsed by OruConfig.from_dict() at runtime
+    oru_block = _as_mapping(cfg.get("oru"))
+    if oru_block:
+        params["oru_config"] = dict(oru_block)
+
+    # Chaos trigger — forward raw sub-dict; parsed by ChaosConfig.from_dict() at runtime
+    chaos_block = _as_mapping(cfg.get("chaos"))
+    if chaos_block:
+        params["chaos_config"] = dict(chaos_block)
 
     return params
 

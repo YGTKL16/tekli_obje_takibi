@@ -1,0 +1,97 @@
+# J1: No-Cascade Config — Pure IMM Post-Processing
+#
+# Root cause analysis (kaizen session):
+#   h3 (α=3.0, FazD=8): FinalScore(IMM)=0.6550, Delta=−0.0566 vs raw=0.7116
+#   IMM worse on 110/255 sequences.
+#
+# Two confirmed cascade mechanisms:
+#   1. Faz D (refresh_patience=8): fires tracker.init(frame, KF_state) after 8 moderate-conf
+#      frames. Even with stable KF (α=1.0), corrupts template on person/player sequences.
+#      Evidence: i1 (α=1.0, FazD=8) → tennis_player1_1 dAUC=−0.688 (same as h3's −0.687!)
+#      g1a (α=1.0, FazD=0) → tennis_player1_1 dAUC=+0.001 ← FIXED
+#
+#   2. Great Rescue (reject_streak≥5): fires tracker.init(frame, KF_state) when coasting.
+#      KF predicts "stand still" during coast → rescue at stale position → permanent loss.
+#      Evidence: g1a (FazD=0, rescue=5) → bus2-n dAUC=−0.471, person14 dAUC=−0.624.
+#
+# Fix: disable BOTH cascade mechanisms.
+#   refresh_patience: 0  (Faz D completely off)
+#   rescue_streak_threshold: 999  (Great Rescue effectively disabled)
+#   singer.alpha: 1.0  (keep safe value; UAV sequences use Singer rarely vs person sequences)
+#
+# This makes IMM a pure post-processor:
+#   conf >= 0.740469 → output AI bbox (bypass, same as raw)
+#   conf <  0.740469 → output KF state (smoothed prediction)
+#   KF template never modified after frame 0.
+#
+# Expected: IMM ≈ raw for stable sequences; slight improvement during brief conf dips.
+# Baseline raw FinalScore: 0.7116
+# g1a FinalScore on 11 worst seqs: IMM=0.4959 (bus2/Motor2 still failing)
+# j1 expected: bus2/Motor2/person14 recover to near-raw performance
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0        # safe non-UAV value; was 3.0 in h3 (UAV-tuned)
+  sigma2_a: 25.0    # conservative; was 100.0 in h3
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  # J1: Faz D DISABLED — primary cascade mechanism on person/player sequences.
+  # g1a proved: refresh_patience=0 fixes tennis_player1_1 (+0.001), basketball_player1 (+0.000),
+  # hiker2 (−0.691 → −0.063), person9 (−0.664 → −0.179).
+  refresh_patience:   0
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+  # J1: Great Rescue DISABLED — secondary cascade mechanism.
+  # reject_streak≥5 + coast fires tracker.init(KF_bbox); KF predicts "stand still" → wrong position.
+  # Setting to 999 effectively disables rescue. AI handles self-recovery internally.
+  rescue_streak_threshold: 999

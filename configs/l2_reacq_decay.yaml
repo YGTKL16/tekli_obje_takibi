@@ -1,0 +1,84 @@
+# L2: Reacquisition R-Inflation — Post-Coast R Smoothing  [REJECTED ❌]
+# REJECT: reacq_r_decay=0.2 → uav1 canary -0.064, bus2-n -0.045.
+# R_factor=7x for 83-frame coast → eff_conf/2.65 → near-zero KF update after absence.
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+#
+# Motivasyon:
+#   uav1: 5 occlusion run (14-83 frame, toplam 217/3469=%6.2).
+#   Hedef kaybolduktan sonra tekrar görününce, IMM coastinge girer sonra reacq.
+#   İlk güncelleme noisy ise (büyük d2), KF state bozulabilir.
+#   reacq_r_decay > 0: R = R * (1 + decay * min(coast_count, 30))
+#   → Coast uzunsa, ilk güncellemenin R'ı şişer → KF yavaş yakınsar (overcorrect yok).
+#
+# Parametreler:
+#   reacq_r_decay=0.2: R_factor = 1 + 0.2 * min(coast, 30)
+#     Kısa coast (1 frame): R_factor=1.2 → %20 şişme → ihmal edilebilir
+#     Uzun coast (83 frame): R_factor = 1 + 0.2*30 = 7.0 → %600 şişme → çok güvenli
+#
+# Beklentiler:
+#   uav1: reacq sonrası daha stabil → IMM delta artabilir (+0.041 → daha fazla?)
+#   Kısa coast (0-2 frame) olan seqlarda: ihmal edilebilir etki
+#   Uzun occlusion seqlarda: potansiyel iyileşme
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+
+soft_fusion:
+  alpha_gate_k_conf: 0.0    # kapat — lag yaratıyor
+  alpha_gate_lambda: 0.0    # kapat — l1b sonuçları bekleniyor
+  reacq_r_decay: 0.2        # Post-coast R şişirme: 1 + 0.2*min(coast,30)

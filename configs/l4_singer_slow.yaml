@@ -1,0 +1,72 @@
+# L4: Singer Alpha Tuning — Slower Acceleration Decorrelation  [REJECTED ❌]\n# REJECT: alpha=0.1 (τ=10 frame) → uav1 canary -0.073.\n# Root cause: Long absence (83 frames) + persistent accel memory → wrong state after reappearance.
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+#
+# Singer model: alpha = 1/τ (maneuver time constant inverse)
+#   F[a,a] = exp(-alpha * T) where T=1 frame
+#   alpha=1.0: F[a,a]=exp(-1)=0.368 → accel decays 63% per frame (current)
+#   alpha=0.1: F[a,a]=exp(-0.1)=0.905 → accel decays 9.5% per frame (persistent)
+#
+# Hipotez: uav1 gibi UAV sekansları 5-20 frame süren ivmelenmeler yapar.
+# alpha=0.1 ile Singer modeli bu kalıcı ivmelenmeleri daha iyi yakalar.
+# IMM uav1(+0.041) daha da iyileşebilir.
+#
+# Canary: uav1, bike5 (stabil tutulmalı), car3 (stabil tutulmalı)
+# NOT: sigma2_a burada önemsiz — _apply_imm_config Q'yu üstüne yazar.
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 0.1       # 1/τ: τ=10 frames persistent accel (vs 1.0=1frame)
+  sigma2_a: 25.0   # irrelevant — overwritten by set_model_process_noise
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70

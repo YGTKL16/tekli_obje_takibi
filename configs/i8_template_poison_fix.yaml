@@ -1,0 +1,105 @@
+# I8: Template Poisoning Fix (car6 + bike3 Patoloji)
+#
+# @diagnosis Forensik Raporu — 24 Nisan 2026:
+#
+# car6 (ΔAUC=-0.250): Mahalanobis gate, 5 ardışık frame boyunca doğru AI
+#   ölçümlerini (IoU=0.786-0.868) mahal_bypass_after=5 default nedeniyle
+#   blokladı. Frame 1385'te reject_streak=2 olmasına rağmen gate açılmadı.
+#   Kanıt: Frame 1383-1387 d²=[67,61,52,46,44] >> eşik 23.51, AI h=234-305px
+#   doğru, KF h=135px yanlış kilidi. Rescue ise h=135 yanlış template'le
+#   tetiklenince kalıcı template zehirlenmesi başladı.
+#   Fix: bypass_after: 2 → frame 1385'te Mahal bypass, doğru scale kabul edilir.
+#
+# bike3 (ΔAUC=-0.407): refresh_decline_thr=0.04 çok agresif. Frame 106'da
+#   conf decline=0.175 > 0.04 eşiği → FazD, IoU=0.013 yanlış konumda
+#   tracker.init() tetikledi. 326/432 frame kalıcı kayıp.
+#   Kanıt: decline eşiği 0.04 iken frame 106'da decline=0.175 (4.4×).
+#   Fix: refresh_decline_thr: 0.20 → bu spesifik ölümcül reinit engellenir.
+#
+# NOT: mahalanobis.bypass_after YAML'dan okunmuyordu (config.py'de eksik parsing).
+#   Bu PR'da düzeltildi: config.py'de mahal.get("bypass_after") eklendi.
+#
+# Baseline: i1_revert_singer raw=0.6632, IMM=0.7080
+# Gate: IMM > 0.7280 (+0.020 minimum)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  # FIX car6: bypass_after: 2 → artık config.py'den okunan ve IMMPolicy'e giden
+  # bir parametre. Default 5'ken YAML'da 2 yazıyor ama sessizce yoksayılıyordu.
+  bypass_after: 2            # was: silently defaulting to 5 in ab_test.py
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  # FIX bike3: 0.04 → 0.20 — conf decline eşiği yüksek tutularak yanlış
+  # konumlu reinit tetiklenmiyor. Frame 106'da decline=0.175 < 0.20 → BLOK.
+  refresh_decline_thr: 0.20  # was: 0.04 — too aggressive for tiny targets
+  refresh_bypass_lookback: 30
+
+clahe:
+  enabled: false

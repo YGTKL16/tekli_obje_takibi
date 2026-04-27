@@ -1,0 +1,82 @@
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+ai:
+  conf_refresh_high: 0.65
+  conf_refresh_low: 0.35
+  cv_conf_min: 0.65
+  cv_stable_thr: 0.7
+  f5_feedback: true
+  f5_scale_guard: 1.5
+  max_consecutive_skips: 2
+  refresh_bypass_lookback: 0
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_patience: 8
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  search_scale_boost: 0.0
+  singer_skip_thr: 0.35
+  skip_when_confident: false
+blend:
+  alpha_conf_hi: 0.845429
+  alpha_conf_lo: 0.373544
+chaos:
+  chaos_max: 0.2
+  chaos_thr: 0.08
+  enabled: false
+  min_chaos_conf_factor: 0.15
+  min_samples: 5
+  window: 10
+decision:
+  coast_threshold: 0.140301
+  conf_threshold: 0.186309
+  max_coast_frames: 44
+hygiene:
+  aspect_ratio_hi: 7.099779
+  aspect_ratio_lo: 0.1
+  max_area_frac: 0.34594
+  max_center_jump_frac: 0.511044
+  reinit_after: 10
+imm:
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  q_scale: 31.113513
+  transition_matrix:
+    pi_persist: 0.96
+mahalanobis:
+  bypass_after: 5
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  bypass_conf_thr: 0.7
+  bypass_vel_thr: 3.0
+  chi2_threshold: 23.51
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+oru:
+  conf_reentry_min: 0.5
+  enabled: true
+  n_max: 30
+  n_min: 5
+  ring_buffer_size: 35
+  singer_dom_thr: 0.7
+  skip_if_singer_dom: true
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  maneuver_bypass_boost: 0.1
+  maneuver_threshold: 0.4
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+vel_innov_min_innov: 35.0
+vel_innov_min_speed: 2.0
+vel_innov_ratio_gate: 10.0

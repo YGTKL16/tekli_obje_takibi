@@ -1,0 +1,100 @@
+# I11: Smart (Dynamic) FazD Cooldown — Akıllı Template Yenileme Sönümlemesi
+#
+# Kaizen Trial #8 | 2026-04-24 | Baseline: i9c IMM=0.7195
+#
+# Teşhis (Root Cause — FazD Positive Feedback Loop):
+#   FazD her 'refresh_patience' frame'de bir template refresh yapar.
+#   bike3 gibi küçük hedeflerde AI kutusu milimetrik offset içerir.
+#   Her refresh → o anki küçük bias "Mutlak Doğru" olarak kaydedilir.
+#   KF bu şablona uyum sağlarken kayar → 15 frame sonra kayık yer yeni merkez olur.
+#   Sonuç: Positive Feedback Loop → kutunun hedeften yavaş yavaş drift etmesi.
+#
+# Tedavi (i11 Smart Cooldown):
+#   refresh_min_interval = 60   → Küresel sönümleme: en az 2 sn @ 30fps arası refresh yok
+#   refresh_small_area_thr = 400  → 20×20 px² altı = "küçük hedef"
+#   refresh_small_interval = 90   → Küçük hedeflerde 3 sn @ 30fps cooldown (daha sert sönümleme)
+#
+#   Bu süre zarfında KF/IMM (Singer α=1.0) kendi ataletiyle küçük hataları sönümler.
+#   Sistem sürekli "güncellenerek" kafası karışmaz, doğru doğrultuda kalır.
+#
+# Dead Variable Fix:
+#   refresh_min_bbox_area = 0.0   → (şimdi pipeline'da gerçekten kullanılıyor)
+#   Gerekirse: refresh_min_bbox_area: 50.0 ile ultra-küçük (7×7 px) refreshleri hard-block edebilirsin.
+#
+# Expected benefit:
+#   bike3:    (0.182 → ?) — FazD drift durduruldu, KF kendi inertia'sıyla stabilize olur
+#   surfer:   (0.520 → ?) — Orta boyut, 60-frame cooldown hataları sönümler
+#   box2:     0.626 → korunmalı (patience=8 zaten bunu koruyordu)
+#   car6:     0.871 → korunmalı (velocity bypass bu seçimi etkilemiyor)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5            # static fallback
+  bypass_conf_thr: 0.70      # conf >= 0.70 → eligible for fast bypass
+  bypass_vel_thr: 3.0        # velocity discriminator for fast/slow path
+  bypass_after_fast: 2       # maneuver path: car6-type (high conf + high vel)
+  bypass_after_slow: 5       # ID-switch path: basketball-type (low/moderate conf)
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8      # consecutive moderate-conf frames before refresh fires
+  refresh_decline_thr: 0.04  # conf must drop >= this from streak start
+  refresh_bypass_lookback: 30  # B gate: block Faz D if bypass fired within N frames
+
+  # i11: Smart Cooldown — Akıllı Sönümleme (Dead Variable Fix + Yeni Parametreler)
+  refresh_min_bbox_area: 0.0    # px²: hard-block refresh if KF bbox smaller than this (0=disabled)
+  refresh_min_interval: 60      # global cooldown: min frames between any two refreshes (0=disabled)
+  refresh_small_area_thr: 400.0 # px²: targets smaller than this use the long cooldown (20×20px)
+  refresh_small_interval: 90    # cooldown for tiny targets: 3 sec @ 30fps (0=use refresh_min_interval)

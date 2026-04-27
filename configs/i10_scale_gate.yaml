@@ -1,0 +1,96 @@
+# I10: Scale-Adaptive Faz D Center-Distance / IoU Gate (C Gate)
+#
+# Kaizen Trial #8 | 2026-04-24 | Baseline i9=0.7195
+#
+# Problem: i9 has two known regressions:
+#   bike3 (−0.407): FazD fires at frame 106 on a tiny 13×17px²=221px² target.
+#     KF and AI det are 9px apart but diag=21px → gate_score=0.43.
+#     With thr=0.35 → BLOCKED. Prevents poisoning the template.
+#   Surfing12 NP (−0.099): velocity-gate related (separate issue, unaffected here).
+#
+# Solution: C gate — scale-adaptive Faz D spatial coherence gate:
+#   Small targets (AI bbox area < fazd_area_small_thr px²):
+#     Block refresh if center_dist(KF_pred, AI_det) / diag(AI_det) > fazd_center_dist_gate_thr
+#   Large targets (area >= fazd_area_small_thr):
+#     Block refresh if IoU(KF_pred, AI_det) < fazd_iou_gate_thr
+#
+# Target:
+#   bike3:  0.182 → 0.590 (+0.408) — C gate blocks bad frame-106 refresh
+#   Others: no regression relative to i9
+#
+# Tuning notes:
+#   fazd_area_small_thr=625: 25×25px² — bike3 at 221px² is "small"; normal targets > 625
+#   fazd_center_dist_gate_thr=0.35: bike3 bad case gate_score=0.43 → BLOCKED
+#                                   bike3 OK alignment ~0.14 → PASSES
+#   fazd_iou_gate_thr=0.25: large targets — prevents distractor refresh on low-IoU detection
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5            # static fallback (used when dynamic disabled)
+  bypass_conf_thr: 0.70      # conf >= 0.70 → eligible for fast bypass
+  bypass_vel_thr: 3.0        # disabled — conf alone as first discriminator
+  bypass_after_fast: 2       # maneuver path: car6-type (high conf)
+  bypass_after_slow: 5       # ID-switch path: basketball-type (low/moderate conf)
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8     # Faz D: consecutive moderate-conf frames before refresh fires
+  refresh_decline_thr: 0.04 # Faz D: conf must drop >= this from streak start
+  refresh_bypass_lookback: 30  # B gate: block Faz D if bypass fired within N frames
+  # C gate (i10): scale-adaptive Faz D spatial coherence
+  fazd_area_small_thr: 625.0          # px²; area < this → tiny target path
+  fazd_center_dist_gate_thr: 0.35     # tiny targets: block if center_dist/diag > this
+  fazd_iou_gate_thr: 0.25             # large targets: block if IoU(KF_pred, AI_det) < this
+  # Size guard: left at 0 (disabled). Tested 400-2000px² — all broke car1_s which
+  # depends on FazD.  Tiny-target blind spot (bike3) remains a known regression.
+  refresh_min_bbox_area: 0.0

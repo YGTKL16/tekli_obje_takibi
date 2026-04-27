@@ -1,0 +1,104 @@
+# K2: Staggered Rescue — Bypass/Rescue Stratejik Kademelendirme
+#
+# Kaizen Trial | 2026-04-26 | Baseline: i12_rescue_area_gate.yaml IMM=0.7139 (255-seq)
+#
+# Sorun: bypass_after_slow=5 ve rescue_streak_threshold=5 aynı eşik.
+#   Streak=5'te hem Mahal gate kalkar (bypass başlar) HEM DE Rescue ateşlenebilir.
+#   "Uçak hem otonom iniş hem fırlatma koltuğu" çelişkisi.
+#
+# Çözüm (Stratejik Kademelendirme):
+#   Streak 1–4:  Mahal gate aktif → kötü ölçüm reddedilir.
+#   Streak 5:    bypass_after_slow=5 → Mahal gate KALKAR, KF AI'ı dinlemeye başlar. [TAKTİK]
+#   Streak 6–9:  Bypass açık, KF toparlanmayı dener.
+#   Streak 10:   rescue_streak_threshold=10 → Template reinit (Rescue). [STRATEJİK]
+#
+# Bypass_fast (conf≥0.70 + speed≥3px/frame → bypass_after_fast=2) bu değişiklikten
+# etkilenmiyor: hızlı ve güvenilir path kendi hızında çalışır.
+#
+# Güvenlik: max_coast_frames=44 >> rescue_streak_threshold=10
+#   → Coast sona ermeden önce Rescue mutlaka tetiklenecek. Kayıp senaryosu yok.
+#
+# Test: python3 scripts/ab_test.py --mode ai_lead --gmc --adaptive-r \
+#          --imm-config configs/k2_staggered_rescue.yaml
+# KABUL kriteri: Δ ≥ +0.001 vs i12 baseline (FS_imm=0.7139)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+  rescue_streak_threshold: 10   # MUTATION: was default 5 → Stratejik Kademelendirme
+                                 # Bypass(5) önce, Rescue(10) sonra.
+                                 # Geçerli aralık: [bypass_after_slow+1, max_coast_frames-1] = [6, 43]
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5        # Taktik eşik: 5. karede Mahal gate kalkar
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+
+  # Faz D: Proactive template refresh
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+
+  # i11: Smart Cooldown
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+
+  # i12: Great Rescue Area Gate
+  rescue_min_area: 220.0
+
+  # F5: Closed-loop feedback
+  f5_feedback: true

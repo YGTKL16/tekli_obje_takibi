@@ -1,0 +1,105 @@
+# I4: Dynamic Q from Aspect Ratio Rate (Roll/Bank Detection)
+#
+# Hypothesis: When the tracked object banks/rolls (drone yaw, person turn), the
+#   bounding box aspect ratio changes rapidly: w/h shifts in 1-3 frames.
+#   If Q is static, the KF underestimates process uncertainty in these moments →
+#   update lag → predicted position drifts → AI confidence drops → coast chain.
+#
+# Fix: On each predict(), compute delta_AR = |AR_now - AR_from_last_measurement|.
+#   Q_boost = min(1 + delta_AR * ar_q_sensitivity, ar_q_boost_cap)
+#   Temporarily scale all 3 model Q matrices by Q_boost for that one predict cycle.
+#   After combine_estimates(), Q matrices are restored to baseline.
+#
+# Parameters (conservative first pass):
+#   ar_q_sensitivity = 10.0  → ΔAR=0.2 gives boost=3.0 (cap); ΔAR=0.05 gives boost=1.5
+#   ar_q_boost_cap   = 3.0   → max 3× Q inflation per frame
+#
+# Risk: MEDIUM — C++ change, but reversible (Q restored after predict).
+#   Over-sensitivity inflates Q every frame on targets with normal AR variation.
+#   Start conservative (sensitivity=10, cap=3). Tune with A/B.
+#
+# Baseline: raw FinalScore=0.7116, IMM=0.6550 (configs/i3_clahe.yaml if CLAHE accepted)
+# Expected gain: UAV/drone sequences with fast banking (dataset3/uav*, dataset1/plane)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
+singer:
+  alpha: 3.0
+  sigma2_a: 100.0
+  # I4: Dynamic Q from aspect-ratio rate
+  # Detects roll/bank maneuvers and temporarily inflates process noise.
+  # sensitivity=0 → disabled. Start: 10.0, cap: 3.0 (ΔAR=0.2 → 3× Q)
+  ar_q_sensitivity: 10.0    # q_boost = 1 + |delta_AR| * sensitivity; range [0, 30]
+  ar_q_boost_cap: 3.0       # max Q multiplier per frame; range [1.5, 8.0]
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+clahe:
+  enabled: false   # test AR-Q in isolation first; combine with CLAHE after acceptance

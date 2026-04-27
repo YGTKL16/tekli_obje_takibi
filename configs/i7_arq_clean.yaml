@@ -1,0 +1,90 @@
+# I7: Singer Fix + Dynamic Q AR only (CLAHE disabled)
+#
+# Root-cause analysis of i6 regression:
+#   CLAHE enhanced contrast on water/outdoor sequences → AI confusion
+#   Kiting: -0.141, Surfing12: -0.129, plane: -0.057, surfer: -0.136
+#   CLAHE REJECT for general use. Test only on targeted night sequences.
+#
+# This config tests i1 (α=1.0) + AR-Q=10.0 without CLAHE interference.
+# Baseline: i1 raw=0.6632, IMM=0.7080
+# Gate: IMM > 0.7080
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+  ar_q_sensitivity: 10.0
+  ar_q_boost_cap: 3.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+clahe:
+  enabled: false   # CLAHE REJECTED for general use — hurts water/outdoor sequences

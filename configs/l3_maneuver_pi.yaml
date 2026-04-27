@@ -1,0 +1,82 @@
+# L3: D1 Maneuver PI Detector — Dinamik Singer Boost  [REJECTED ❌]
+# REJECT: uav1 canary -0.134 disaster. Post-83-frame-coast: d2=huge, D1 fires,
+# Singer gets wrong accumulated velocity → wrong trajectory prediction.
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+#
+# D1 Mekanizması (imm_policy.py):
+#   d2_raw > maneuver_pi_thr (16.0) → agile_pi kullan:
+#   Normal pi: [[0.96, 0.02, 0.02], [0.02, 0.96, 0.02], [0.02, 0.02, 0.96]]
+#   Agile pi:  [[0.72, 0.08, 0.20], [0.08, 0.72, 0.20], [0.10, 0.10, 0.80]]
+#   Singer (model 2) hızla dominant olur → ani manevra takibi iyileşir.
+#   Güncelleme sonrası normal pi restore edilir.
+#
+# Hedef sekanlar:
+#   uav1 (dataset4): Hızlı UAV, anlık yön değişimleri, d2 spikeli
+#   uav4 (dataset5): d2 TRT artefact, ama gerçek temeli var
+#
+# Risk: Sahte d2 spike'larında (gürültü, yanlış deteksiyon) Singer kötü sonuç verebilir.
+# Canary test önce 4 sekans: uav1, bike5, car3 (stabil), MountainBike6
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+  maneuver_detector:
+    enabled: true
+    chi2_threshold: 16.0     # d2 > bu eşik → Singer boost
+    pi_persist: 0.72         # Agile pi diagonal (Singer dominant için düşür)
+    pi_singer_boost: 0.20    # Singer'a ekstra pi payı
+    normal_pi_persist: 0.96  # Güncelleme sonrası restore değeri
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70

@@ -2,7 +2,8 @@
 
 import numpy as np
 import pytest
-from tracker.imm_policy import IMMObservation
+from tracker.gmc import GMCQualityReport
+from tracker.imm_policy import IMMObservation, IMMPolicyStep
 from unittest.mock import patch, MagicMock
 
 import tracker_cpp  # pyright: ignore[reportMissingImports]
@@ -211,3 +212,160 @@ class TestPipeline:
         assert ai.init.call_count >= 2
         # set_state is never used in ai_lead mode — rescue uses init() instead.
         ai.set_state.assert_not_called()
+
+    @patch("tracker.pipeline.HAS_CV2", True)
+    @patch("tracker.pipeline.cv2")
+    def test_good_gmc_applies_warp(self, mock_cv2):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_cv2.VideoCapture.return_value = _fake_cap([frame, frame])
+        mock_cv2.cvtColor.side_effect = lambda img, code: img
+        mock_cv2.COLOR_BGR2RGB = 4
+
+        init_bbox = np.array([100, 200, 50, 60], dtype=np.float32)
+        ai = MagicMock()
+        gmc = MagicMock()
+        gmc.estimate_with_quality.return_value = (
+            np.eye(3, dtype=np.float64),
+            GMCQualityReport(
+                match_count=40,
+                inlier_count=30,
+                inlier_ratio=0.75,
+                quality_state="good",
+                raw_ok=True,
+            ),
+        )
+
+        dummy_step = IMMPolicyStep(
+            bbox=init_bbox.tolist(),
+            state=np.zeros(10, dtype=np.float32),
+            predicted_state=np.zeros(10, dtype=np.float32),
+            accepted_measurement=False,
+            measurement_sane=False,
+            should_coast=False,
+            reject_streak=0,
+            last_good_bbox=init_bbox.tolist(),
+        )
+
+        from tracker.pipeline import Pipeline
+
+        with patch("tracker.pipeline.SGLATrackWrapper", return_value=ai), \
+             patch("tracker.pipeline.GMCEstimator", return_value=gmc), \
+             patch(
+                 "tracker.pipeline.observe_with_guidance",
+                 return_value=IMMObservation(
+                     bbox=None,
+                     confidence=0.0,
+                     search_bbox=init_bbox.tolist(),
+                     candidate_bboxes=np.zeros((0, 4), dtype=np.float32),
+                     candidate_scores=np.zeros((0,), dtype=np.float32),
+                 ),
+             ), \
+             patch("tracker.pipeline.step_guided_imm", return_value=dummy_step):
+            p = Pipeline(
+                video_path="/fake/video.mp4",
+                initial_bbox=init_bbox,
+                gmc_enabled=True,
+                show=False,
+            )
+            p.kf = MagicMock()
+            p.kf.get_state.return_value = np.zeros(10, dtype=np.float32)
+            p.kf.predict.return_value = np.zeros(10, dtype=np.float32)
+            p.kf.get_model_probabilities.return_value = np.array([0.2, 0.3, 0.5], dtype=np.float32)
+            p.state_machine = MagicMock()
+            p.state_machine.step.return_value = tracker_cpp.TrackState.TRACKING
+            p.state_machine.coast_count.return_value = 0
+            p.run()
+
+        p.kf.apply_gmc.assert_called_once()
+        p.kf.set_gmc_failed.assert_not_called()
+
+    @patch("tracker.pipeline.HAS_CV2", True)
+    @patch("tracker.pipeline.cv2")
+    def test_vetoed_gmc_suppresses_maneuver_and_freezes_next_frame(self, mock_cv2):
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        mock_cv2.VideoCapture.return_value = _fake_cap([frame, frame, frame])
+        mock_cv2.cvtColor.side_effect = lambda img, code: img
+        mock_cv2.COLOR_BGR2RGB = 4
+
+        init_bbox = np.array([100, 200, 50, 60], dtype=np.float32)
+        ai = MagicMock()
+        gmc = MagicMock()
+        gmc.estimate_with_quality.side_effect = [
+            (
+                np.eye(3, dtype=np.float64),
+                GMCQualityReport(
+                    match_count=12,
+                    inlier_count=3,
+                    inlier_ratio=0.25,
+                    quality_state="veto",
+                    raw_ok=False,
+                    reason="history_veto",
+                ),
+            ),
+            (
+                np.eye(3, dtype=np.float64),
+                GMCQualityReport(
+                    match_count=40,
+                    inlier_count=30,
+                    inlier_ratio=0.75,
+                    quality_state="good",
+                    raw_ok=True,
+                ),
+            ),
+        ]
+
+        dummy_step = IMMPolicyStep(
+            bbox=init_bbox.tolist(),
+            state=np.zeros(10, dtype=np.float32),
+            predicted_state=np.zeros(10, dtype=np.float32),
+            accepted_measurement=False,
+            measurement_sane=False,
+            should_coast=False,
+            reject_streak=0,
+            last_good_bbox=init_bbox.tolist(),
+        )
+
+        from tracker.pipeline import Pipeline
+
+        with patch("tracker.pipeline.SGLATrackWrapper", return_value=ai), \
+             patch("tracker.pipeline.GMCEstimator", return_value=gmc), \
+             patch(
+                 "tracker.pipeline.observe_with_guidance",
+                 return_value=IMMObservation(
+                     bbox=None,
+                     confidence=0.0,
+                     search_bbox=init_bbox.tolist(),
+                     candidate_bboxes=np.zeros((0, 4), dtype=np.float32),
+                     candidate_scores=np.zeros((0,), dtype=np.float32),
+                 ),
+             ), \
+             patch("tracker.pipeline.step_guided_imm", return_value=dummy_step) as step_mock:
+            p = Pipeline(
+                video_path="/fake/video.mp4",
+                initial_bbox=init_bbox,
+                gmc_enabled=True,
+                maneuver_pi_enabled=True,
+                maneuver_bypass_boost=0.10,
+                gmc_freeze_frames_after_veto=1,
+                show=False,
+            )
+            p.kf = MagicMock()
+            p.kf.get_state.return_value = np.zeros(10, dtype=np.float32)
+            p.kf.predict.return_value = np.zeros(10, dtype=np.float32)
+            p.kf.get_model_probabilities.return_value = np.array([0.1, 0.4, 0.5], dtype=np.float32)
+            p.state_machine = MagicMock()
+            p.state_machine.step.return_value = tracker_cpp.TrackState.TRACKING
+            p.state_machine.coast_count.return_value = 0
+            p.run()
+
+        assert p.kf.apply_gmc.call_count == 1
+        assert p.kf.set_gmc_failed.call_count == 1
+        assert step_mock.call_count == 2
+        first_kwargs = step_mock.call_args_list[0].kwargs
+        second_kwargs = step_mock.call_args_list[1].kwargs
+        assert first_kwargs["maneuver_probability"] == 0.0
+        assert first_kwargs["maneuver_bypass_boost"] == 0.0
+        assert first_kwargs["maneuver_pi_enabled"] is False
+        assert second_kwargs["maneuver_probability"] == 0.0
+        assert second_kwargs["maneuver_bypass_boost"] == 0.0
+        assert second_kwargs["maneuver_pi_enabled"] is False

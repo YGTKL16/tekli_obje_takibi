@@ -30,9 +30,10 @@ SUBSET = [
     "dataset2/ManRunning2", "dataset2/RcCar3", "dataset2/Surfing12",
     "dataset2/Wakeboarding2", "dataset3/air_conditioning_box2",
     "dataset3/basketball_player4-n", "dataset3/duck1_1",
-    "dataset3/truck_night", "dataset4/car6", "dataset5/bike3",
-    "dataset5/building2", "dataset5/car1_3", "dataset5/car1_s",
-    "dataset5/person2_2",
+    "dataset3/truck_night", "dataset3/uav1", "dataset4/car6",
+    "dataset4/uav1", "dataset5/bike3", "dataset5/building2",
+    "dataset5/car1_3", "dataset5/car1_s", "dataset5/person2_2",
+    "dataset5/uav1_2", "dataset5/uav4",
 ]
 
 

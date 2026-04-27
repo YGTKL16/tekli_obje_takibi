@@ -1,0 +1,99 @@
+# N6: F5 Rolling-Reject Gate (Tighter Threshold)
+#
+# Kaizen Trial | 2026 | Baseline: i12 IMM=0.7139 (255-seq)
+#
+# N5 issue: rw=10, rc=3 (30% threshold) still fires 12.6% of frames for car6
+#   → car6 still shows -0.016 regression (vs i12: -0.021)
+#
+# N6 fix: rw=8, rc=5 (62% threshold)
+#   Statistical separation analysis:
+#     car6 (reject_rate≈13%):      fire_prob=0.0014 → near-zero regression expected
+#     building2 (reject_rate≈17%): fire_prob=0.0044 → near-zero regression expected
+#     truck_night (reject_rate≈87%): fire_prob=0.9884 → full benefit preserved
+#     aircon_box2 (reject_rate≈85%): fire_prob=0.9791 → full benefit preserved
+#
+#   Separation ratio: 720x between car6 and truck_night
+#
+# This avoids the coast_only (n4) problem of killing all f5 during accepted frames
+# (which matters for truck_night since ~87% of accepted frames have high local reject rate
+# and thus the rolling window still triggers f5 correctly on those frames too)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  coast_threshold: 0.140301
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  mahal_chi2_threshold: 23.51
+  r_exponent: 2.0
+  adaptive_r: true
+
+regime_adaptive: false
+
+gmc:
+  enabled: false
+  method: ecc
+  min_inliers: 20
+  max_rot_deg: 3.0
+
+ai:
+  kf_mode: ai_lead
+  search_scale_boost: 0.0
+  maneuver_pi_enabled: false
+  refresh_patience: 8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  f5_feedback: true
+  f5_scale_guard: 1.5
+  # N6: Tighter rolling-reject gate (62% threshold)
+  # Statistical analysis: car6 fires 0.14%, truck_night fires 98.8% → 720x separation
+  f5_reject_window: 8
+  f5_reject_min_count: 5
+
+oru:
+  enabled: true
+  n_min: 5
+  n_max: 30
+  conf_reentry_min: 0.50
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+  skip_if_singer_dom: true
+  singer_dom_thr: 0.7
+  ring_buffer_size: 35
+
+chaos:
+  enabled: false
+  window: 10
+  chaos_thr: 0.08
+  chaos_max: 0.20
+  min_chaos_conf_factor: 0.15

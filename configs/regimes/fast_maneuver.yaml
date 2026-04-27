@@ -1,0 +1,28 @@
+# configs/regimes/fast_maneuver.yaml
+#
+# Regime override bundle — FAST_MANEUVER
+#
+# Applies when: native_fps >= 60  OR  rolling-30f median Singer μ > 0.40
+#   (e.g. car8, uav1, high-fps vehicle sequences)
+#
+# Rationale:
+#   • At high speed, KF prediction lags behind AI detection.
+#     Closed-loop F5 feedback (set_state) anchors the search window to the
+#     stale KF bbox → AI misses the target → AUC collapse.
+#   • Disabling F5 lets AI search freely → car8: 0.447 → 0.839.
+#   • maneuver_pi_enabled: dynamic Singer probability injection on Mahal spike
+#     compensates for the loss of KF guidance by boosting maneuvering mode.
+#   • Short max_coast: fast targets are recoverable only if re-found quickly;
+#     coasting on a stale prediction of a fast mover is harmful.
+#
+# Evidence: ab_test --lk-jitter smoke: car8 AUC 0.447→0.839 with F5=False.
+
+ai:
+  f5_feedback: false
+
+smart_intervention:
+  maneuver_pi_enabled: true    # dynamic pi injection on Mahalanobis spike
+  # inherit maneuver_pi_thr / maneuver_pi_persist / maneuver_pi_singer_boost from base config
+
+decision:
+  max_coast_frames: 20          # fail-fast on lost fast target

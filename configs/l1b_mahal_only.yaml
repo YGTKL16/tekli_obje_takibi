@@ -1,0 +1,82 @@
+# L1b: Alpha Blend — Mahalanobis-Only (No Conf Sigmoid)  [REJECTED ❌]
+# REJECT: FS_imm=0.7090 < i12+T1 0.7094. uav1 IMM -0.043. Mean IMM diff=-0.0005.
+# Root cause: accumulated lambda=0.5 softening over 3469 frames → trajectory lag.
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+#
+# L1 (k_conf=5.0, lambda=0.3) Canary Sonucu:
+#   truck1: +0.0022  (i12: 0.000)   ✅ l1 iyileştirdi
+#   uav1:   +0.0319  (i12: -0.012)  ✅ l1 iyileştirdi
+#   bike5:  -0.0155  (i12: -0.0001) ❌ l1 bozdu! k_conf=5.0 → conf≈0.3-0.5'te α≈0.15-0.5 → lag
+#   bus2-n: +0.0000  (i12: +0.0004) ≈ neutral
+#
+# L1 Problemi: k_conf=5.0 ile conf=0.3'te sigmoid=0.119 → alpha çok düşük → KF güncelleme lag.
+# Hızlı hareket eden küçük hedefler (bike5) için lag öldürücü.
+#
+# L1b Düzeltme: k_conf=0.0 (sigmoid kaldırıldı) → yalnızca Mahalanobis baskısı.
+# alpha = exp(-0.5 * d2 / chi2_max)
+#   d2=0:         alpha=1.0  (iyi deteksiyon, tam güncelleme)
+#   d2=chi2_max:  alpha=exp(-0.5)≈0.607  (sınır deteksiyon, %60 güncelleme)
+# bike5: KF doğru takip ediyorsa d2≈0 → alpha≈1.0 → lag yok.
+# Gerçek anlam: Mahalanobis kapısından zor geçen ölçümler daha yumuşak günceller.
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+
+soft_fusion:
+  alpha_gate_k_conf: 0.0     # sigmoid devre dışı — conf-sigmoid lag yaratıyor
+  alpha_gate_lambda: 0.5     # sadece Mahalanobis baskısı: exp(-0.5*d2/chi2_max)

@@ -26,6 +26,13 @@ constexpr float   kGmcDefaultRansacReproj   = 3.0F;
 constexpr float   kGmcDefaultDilateFactor   = 1.4F;
 constexpr float   kGmcDefaultDownsample     = 0.5F;
 
+struct GMCEstimateStats {
+    int32_t match_count  = 0;
+    int32_t inlier_count = 0;
+    float   inlier_ratio = 0.0F;
+    bool    has_affine   = false;
+};
+
 /// @brief ORB + partial-affine Global Motion Compensation.
 ///
 /// Design constraints (JSF AV):
@@ -65,6 +72,16 @@ public:
         const cv::Mat& curr_gray,
         const float    fg_xywh[4],
         HomMat&        H_out
+    );
+
+    /// Estimate affine motion and expose raw support statistics for
+    /// higher-level quality gating.
+    [[nodiscard]] bool estimate_with_stats(
+        const cv::Mat&       prev_gray,
+        const cv::Mat&       curr_gray,
+        const float          fg_xywh[4],
+        HomMat&              H_out,
+        GMCEstimateStats&    stats_out
     );
 
 private:

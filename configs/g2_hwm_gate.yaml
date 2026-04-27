@@ -1,0 +1,84 @@
+# G2: High-Watermark Gate for Faz D proactive refresh
+# Hypothesis: bike3 cascade fires because Faz D has no gate on the target's
+# tracking quality BEFORE it entered the moderate-confidence zone.
+# air_cond/truck_night had conf > 0.65 before declining → genuine staleness spiral.
+# bike3 NEVER had conf > 0.65 → Faz D fires on a target that was never well-tracked.
+#
+# Change vs imm_tuned.yaml:
+#   ai.refresh_min_conf_peak: 0.0 → 0.65
+#   Gate: Faz D fires only if conf was observed above conf_refresh_high (0.65)
+#   at some point since last reinit. Otherwise the streak is silently cleared.
+#
+# Expected:
+#   bike3: conf never > 0.65 → gate BLOCKS → cascade prevented → +0.407 recovery
+#   air_cond: conf was 0.80+ before decay → gate PASSES → rescue preserved ✓
+#   truck_night: conf was 0.75+ before decay → gate PASSES → rescue preserved ✓
+#   car1_s: conf was high before decay → gate PASSES → rescue preserved ✓
+#
+# Baseline: FinalScore=0.7140 (imm_tuned.yaml, 20-seq subset, --mode ai_lead)
+# Test: python3 scripts/ab_test.py --mode ai_lead --gmc --adaptive-r --imm-config configs/g2_hwm_gate.yaml
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 3.0
+  sigma2_a: 100.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_min_bbox_area: 0.0
+  # G2: High-watermark gate — Faz D fires only if confidence was observed above
+  # conf_refresh_high (0.65) since last reinit. Prevents rescue attempts on
+  # targets that were never well-tracked (e.g. bike3 cascade).
+  # 0.0 = disabled. 0.65 = must have exited moderate zone upward at least once.
+  refresh_min_conf_peak: 0.65

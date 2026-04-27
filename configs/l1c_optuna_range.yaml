@@ -1,0 +1,78 @@
+# L1c: Alpha Blend — Within Optuna Range (k_conf=2.0, lambda=0.2)  [REJECTED ❌]
+# REJECT: k_conf=2.0 → uav1 canary -0.054, bike5 -0.013. Lag worse than l1.
+#
+# Kaizen Trial | 2026-04-27 | Baseline: i12 + T1  IMM=0.7094  Delta=+0.0006
+#
+# Motivasyon:
+#   L1 (k=5.0, λ=0.3): Optuna range dışında. bike5'i -0.015 ile bozdu.
+#   L1b (k=0.0, λ=0.5): Optuna range dışında (λ>0.3). Sonuç bekleniyor.
+#   L1c: Optuna range içinde (k∈[0,3], λ∈[0,0.3]).
+#
+# Parametreler:
+#   k_conf=2.0:  conf=0.74'te sigmoid(2*0.24)=sigmoid(0.48)≈0.618 → daha yumuşak lag
+#                conf=0.5'te sigmoid(0)=0.500
+#                conf=0.3'te sigmoid(-0.4)≈0.401 — L1'den çok daha az lag
+#   lambda=0.2:  d2=chi2_max'ta exp(-0.2)≈0.819 → hafif Mahalanobis baskısı
+#
+# Beklenti: L1'den daha az lag, hala Mahalanobis temizliği.
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+
+soft_fusion:
+  alpha_gate_k_conf: 2.0     # Optuna range [0,3] içinde — L1'in 5.0'inden yumuşak
+  alpha_gate_lambda: 0.2     # Optuna range [0,0.3] içinde — L1b'nin 0.5'inden yumuşak

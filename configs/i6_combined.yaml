@@ -1,0 +1,110 @@
+# I6: Combined Kaizen — Singer Fix + Dynamic Q AR + CLAHE
+#
+# Built on TRUE data (Singer params now actually applied to IMMFilter):
+#   TRUE h3 (α=3.0):  raw=0.6757, IMM=0.6737  → Delta=-0.0020  ← HARMFUL
+#   TRUE i1 (α=1.0):  raw=0.6635, IMM=0.7080  → Delta=+0.0445  ← CORRECT
+#
+# Components combined here:
+#   1. Singer α=1.0 (CRITICAL: α=3.0 was destroying car6, bike3, Surfing12)
+#   2. ar_q_sensitivity=10.0 (Dynamic Q AR — tested Δ=+0.0122 on 20-subset)
+#   3. clahe: enabled=true (targeted low-light / night-sequence enhancement)
+#   4. All other params unchanged from h3/i4 Optuna baseline
+#
+# Items already active (no YAML change needed):
+#   - adaptive_r r_exponent=2.0: already in config + --adaptive-r flag
+#   - GMC: active via --gmc flag
+#   - mahalanobis chi2_threshold=23.51: already set (maps to mahal_chi2_gate)
+#
+# Expected: IMM ≥ 0.7200, raw ≥ 0.6800 on 20-subset
+# Gate: Δ_IMM > +0.012 vs TRUE i1 baseline (IMM=0.7080)
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0       # quadratic R scaling: R *= (1/conf)^2
+
+gmc:
+  quality_enabled: true
+  veto_inlier_ratio: 0.20
+  borderline_inlier_ratio: 0.30
+  max_translation_frac_diag: 0.08
+  max_rotation_deg: 12.0
+  history_window: 5
+  history_outlier_mult: 3.0
+  freeze_maneuver_on_veto: true
+  freeze_frames_after_veto: 1
+  n_features: 200
+  n_features_high: 0
+  rot_thr_deg: 3.0
+  high_feature_frames: 8
+
+singer:
+  # I1 SINGER FIX: α=1.0 (τ=1 frame) — literature value for cars/persons/slow UAV
+  # α=3.0 (UAV hypothesis) confirmed HARMFUL on TRUE eval: IMM=0.6737 < raw=0.6757
+  # α=1.0 (C++ default that was silently active) gave IMM=0.7080 > raw=0.6635
+  alpha: 1.0            # 1/τ, was 3.0 (UAV hypothesis — REJECTED)
+  sigma2_a: 25.0        # px²/frame⁴, was 100.0
+  # I4: Dynamic Q from aspect-ratio rate — detects roll/bank maneuvers
+  ar_q_sensitivity: 10.0    # q_boost = 1 + |delta_AR| * sensitivity
+  ar_q_boost_cap: 3.0       # max Q multiplier per frame
+
+mahalanobis:
+  chi2_threshold: 23.51     # maps to mahal_chi2_gate (χ² 4DOF @99%); already active
+  bypass_after: 2
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 30
+
+clahe:
+  # I3: ROI-based CLAHE — enhances low-light and toaster sequences
+  # Applies histogram equalization only on the predicted bbox ROI (scale=3.0)
+  # Isolated test (i3): OBSERVE on 20-subset (no night seqs in subset)
+  # Combined test (i6): first eval with Singer fix + AR-Q together
+  enabled: true
+  clip_limit: 2.0
+  roi_scale: 3.0
+  tile_size: 8

@@ -58,6 +58,10 @@ public:
     /// Confidence floor for adaptive R (default 0.4).
     void set_adaptive_r_floor(float floor) noexcept;
 
+    /// Maximum R multiplier vs baseline for adaptive R (default 10.0).
+    /// Prevents extreme noise inflation at very low confidence.
+    void set_adaptive_r_cap(float cap) noexcept;
+
     /// Configure Singer maneuver model physics.
     /// @param alpha   Maneuver correlation time inverse (1/τ). Range: (0, 20].
     ///                α=1 → τ=1 frame, moderate maneuver; α=10 → rapid
@@ -66,6 +70,13 @@ public:
     ///                σ²=25 → ±5 px/frame² std dev. Larger → more agile.
     /// Immediately rebuilds F[Singer] and Q[Singer] from physical equations.
     void set_singer_params(float alpha, float sigma2_a) noexcept;
+
+    /// Enable dynamic Q scaling based on aspect-ratio rate of change.
+    /// On each predict(), boost = min(1 + |ΔAR| * sensitivity, boost_cap).
+    /// Q_[i] is scaled by boost for that one predict cycle, then restored.
+    /// sensitivity=0 disables the feature (default).
+    /// Typical values: sensitivity 5–20, boost_cap 2–5.
+    void set_ar_q_sensitivity(float sensitivity, float boost_cap = 3.0F) noexcept;
 
     /// Mahalanobis distance squared for measurement z against combined state.
     ///
@@ -90,6 +101,14 @@ public:
 
     /// Reset filter to uninitialised state.
     void reset() noexcept;
+
+    /// Restore filter to a checkpoint (combined state, P, mode probs).
+    /// Replicates @p x and @p P to all per-model x_[i]/P_[i]; sets mu_ = mu.
+    /// initialized_=true, predicted_=false. F/Q/π/R untouched.
+    /// Used by ORU re-update to rewind the filter to a saved snapshot.
+    void restore_from(const StateVec& x,
+                      const StateMat& P,
+                      const ModelProb& mu) noexcept;
 
     /// Override Markov transition matrix (3×3, rows must sum to 1).
     void set_transition_matrix(const TransMat& pi) noexcept;
@@ -147,10 +166,16 @@ private:
     bool  gmc_failed_       = false;
     float gmc_q_boost_      = 4.0F;
     float adaptive_r_floor_ = 0.4F;
+    float adaptive_r_cap_   = 10.0F;  ///< max R multiplier (D2A)
 
     // ── Singer model physics ─────────────────────────────────────
     float singer_alpha_  = 1.0F;   ///< maneuver time constant inverse (1/τ), default τ=1 frame
     float singer_sigma2_ = 25.0F;  ///< acceleration variance [px²/frame⁴], default ±5 px/frame²
+
+    // ── Dynamic Q from aspect-ratio rate (disabled by default) ───
+    float ar_q_sensitivity_ = 0.0F;  ///< px/frame-ratio scale; 0 = disabled
+    float ar_q_boost_cap_   = 3.0F;  ///< max Q multiplier per frame
+    float prev_meas_ar_     = 0.0F;  ///< AR from last accepted measurement (0 = unset)
 };
 
 }  // namespace tracker

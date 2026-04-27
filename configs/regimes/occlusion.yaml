@@ -1,0 +1,24 @@
+# configs/regimes/occlusion.yaml
+#
+# Regime override bundle — OCCLUSION
+#
+# Applies when: coast_count > 8  AND  conf < 0.25
+#   (e.g. Paragliding3, pedestrian behind wall, drone in cloud)
+#
+# Rationale:
+#   • Slow targets with long occlusion need patient coasting.
+#     Default max_coast=44 is too short for some occlusion events.
+#   • Lower coast_threshold allows re-entry at low AI confidence
+#     (recovering target may have low score on first re-detection frame).
+#   • F5 keeps the AI search window anchored to KF prediction during coast,
+#     so when target reappears in the predicted region, AI can re-detect.
+#
+# Evidence: Paragliding3 AUC 0.387 → improved when coast is extended +
+#   lower re-entry threshold. Consistent with i12 analysis of occlusion sequences.
+
+ai:
+  f5_feedback: true
+
+decision:
+  max_coast_frames: 80          # patient coasting through long occlusion events
+  coast_threshold: 0.08         # re-enter at low confidence on reappearance

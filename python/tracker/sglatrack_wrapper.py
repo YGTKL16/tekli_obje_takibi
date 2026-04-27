@@ -54,6 +54,7 @@ class SGLATrackWrapper:
         self.association_top_k = association_top_k
         self.association_iou_threshold = association_iou_threshold
         self.association_score_weight = association_score_weight
+        self._ema_patch_f32: np.ndarray | None = None
 
     def _load_model(self):
         """Load SGLATrack model (deferred until first use)."""
@@ -118,6 +119,7 @@ class SGLATrackWrapper:
         if self.network is None:
             self._load_model()
 
+        self._ema_patch_f32 = None  # reset EMA buffer on fresh init
         self.set_state(bbox)
 
         # Extract and process template
@@ -147,6 +149,34 @@ class SGLATrackWrapper:
         """Synchronize the internal search state with the chosen bbox."""
         bbox_list = bbox.tolist() if isinstance(bbox, np.ndarray) else list(bbox)
         self._state = [float(x) for x in bbox_list]
+
+    def update_template_ema(
+        self, frame_rgb: np.ndarray, bbox, alpha: float = 0.05
+    ) -> None:
+        """Exponential moving average template update.
+
+        Blends the current frame patch into the template buffer with weight
+        *alpha* (new frame weight).  Low alpha = slow/stable update.
+        Called on accepted high-confidence frames to let the template
+        gradually adapt to appearance changes without hard reinit.
+
+        The CE mask is **not** updated — it encodes initial bbox geometry,
+        not image content, so it stays valid across appearance changes.
+        """
+        if not self.initialized or self._sample_target is None:
+            return
+        bbox_list = bbox.tolist() if isinstance(bbox, np.ndarray) else list(bbox)
+        z_patch, _, z_amask = self._sample_target(
+            frame_rgb, bbox_list, self.template_factor, output_sz=self.template_size
+        )
+        patch_f32 = z_patch.astype(np.float32)
+        if self._ema_patch_f32 is None:
+            self._ema_patch_f32 = patch_f32.copy()
+        else:
+            self._ema_patch_f32 = alpha * patch_f32 + (1.0 - alpha) * self._ema_patch_f32
+        blended = np.clip(self._ema_patch_f32, 0.0, 255.0).astype(np.uint8)
+        with self._torch.no_grad():
+            self._z_dict = self.preprocessor.process(blended, z_amask)
 
     def _run_search(self, frame: np.ndarray):
         """Run one search pass without mutating the current state."""
