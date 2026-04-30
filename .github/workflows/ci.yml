@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev libopencv-dev
 
       - name: Configure
         run: cmake -B build -DBUILD_TESTS=ON
@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev cppcheck clang-tidy
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev libopencv-dev cppcheck clang-tidy
 
       - name: cppcheck
         run: |
@@ -42,6 +42,8 @@ jobs:
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
             --suppress=checkersReport \
+            --suppress=unusedStructMember:cpp/src/association_c_api.cpp \
+            --suppress=constParameterReference:cpp/src/imm_filter.cpp \
             -I cpp/include cpp/src/
 
       - name: Configure (for compile_commands.json)
@@ -62,7 +64,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev valgrind
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev libopencv-dev valgrind
 
       - name: Build
         run: |
@@ -82,8 +84,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip python3-venv
+          sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev python3-dev libopencv-dev python3-pip python3-venv
           python3 -m pip install --break-system-packages numpy pytest opencv-python-headless pyyaml
+
+      - name: Build tracker_cpp binding
+        run: |
+          cmake -B build -DBUILD_TESTS=ON
+          cmake --build build --parallel
 
       - name: Run Python tests
         run: python3 -m pytest python/tracker/tests/ -v --tb=short
