@@ -262,3 +262,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Large checkpoint files in root
+*.pth.tar
+output_viz_finetuned/

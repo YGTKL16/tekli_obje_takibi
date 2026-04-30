@@ -289,7 +289,8 @@ def visualize_sequence(tracker, seq_id, seq_info, manifest,
     ann_path = seq_info.get("annotation_path")
     annotations = []
     if ann_path:
-        with open(os.path.join(DATA_ROOT, ann_path)) as f:
+        full_ann = ann_path if os.path.isabs(ann_path) else os.path.join(DATA_ROOT, ann_path)
+        with open(full_ann) as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -640,10 +641,14 @@ def main():
                         help="Run on 20-seq evaluation subset")
     parser.add_argument("--all-full", action="store_true",
                         help="Run on all 255 train sequences")
+    parser.add_argument("--public-lb", action="store_true",
+                        help="Run on all 89 public_lb sequences (uses MISIR GT annotations)")
     parser.add_argument("--imm-config", default=None,
                         help="IMM YAML config (default: configs/h3_singer_uav.yaml)")
     parser.add_argument("--output-dir", default="output_viz",
                         help="Directory to write annotated MP4 files (default: output_viz/)")
+    parser.add_argument("--engine", default=None,
+                        help="TensorRT engine path (default: models/sglatrack_fp16.engine)")
     parser.add_argument("--no-gmc", action="store_true",
                         help="Disable GMC")
     parser.add_argument("--no-adaptive-r", action="store_true",
@@ -657,15 +662,19 @@ def main():
 
     manifest = load_manifest()
 
+    MISIR_GT_ROOT = os.path.join(_PROJECT_ROOT, "MISIR PROJESİ", "SOT DATA")
+
     if args.seq:
         seq_ids = list(args.seq)
     elif args.all_full:
         seq_ids = sorted(manifest["train"].keys())
     elif args.all:
         seq_ids = SUBSET_20
+    elif args.public_lb:
+        seq_ids = sorted(manifest["public_lb"].keys())
     else:
         # Default: prompt user
-        print("No sequence specified. Use --seq SEQID, --all, or --all-full.")
+        print("No sequence specified. Use --seq SEQID, --all, --all-full, or --public-lb.")
         print("Example:  python3 scripts/visualize_tracker.py --seq dataset5/bike3")
         sys.exit(1)
 
@@ -679,13 +688,23 @@ def main():
     print(f"Sequences: {len(seq_ids)}")
     print()
 
-    tracker = TRTTrackWrapper()
+    tracker = TRTTrackWrapper(engine_path=args.engine)
 
     for i, seq_id in enumerate(seq_ids, 1):
-        if seq_id not in manifest["train"]:
+        if seq_id in manifest["train"]:
+            seq_info = dict(manifest["train"][seq_id])
+        elif seq_id in manifest["public_lb"]:
+            seq_info = dict(manifest["public_lb"][seq_id])
+            # Override annotation with MISIR full GT
+            misir_ann = os.path.join(MISIR_GT_ROOT, seq_id, "tracking_results.txt")
+            if os.path.exists(misir_ann):
+                seq_info["annotation_path"] = misir_ann
+                seq_info["_misir_abs"] = True
+            else:
+                print(f"  [WARN] No MISIR GT for {seq_id}, using init-only")
+        else:
             print(f"  [WARN] {seq_id} not in manifest, skipping")
             continue
-        seq_info = manifest["train"][seq_id]
         print(f"[{i}/{len(seq_ids)}] {seq_id}")
         try:
             visualize_sequence(
