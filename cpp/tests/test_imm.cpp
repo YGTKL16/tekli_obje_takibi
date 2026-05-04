@@ -31,6 +31,28 @@ static bool probs_valid(const ModelProb& mu) {
     return std::abs(sum - 1.0f) < 1e-4f;
 }
 
+static StateMat imm_gmc_expected_covariance(const StateMat& P, const HomMat& H) {
+    const float a = H(0, 0);
+    const float b = H(0, 1);
+    const float c = H(1, 0);
+    const float d = H(1, 1);
+
+    StateMat J = StateMat::Zero();
+    J(0, 0) = a;  J(0, 1) = b;  J(0, 2) = 0.5f * (a - 1.0f);  J(0, 3) = 0.5f * b;
+    J(1, 0) = c;  J(1, 1) = d;  J(1, 2) = 0.5f * c;           J(1, 3) = 0.5f * (d - 1.0f);
+    J(2, 2) = 1.0f;
+    J(3, 3) = 1.0f;
+    J(4, 4) = a;  J(4, 5) = b;
+    J(5, 4) = c;  J(5, 5) = d;
+    J(6, 6) = 1.0f;
+    J(7, 7) = 1.0f;
+    J(8, 8) = 1.0f;
+    J(9, 9) = 1.0f;
+
+    StateMat warped = J * P * J.transpose();
+    return 0.5f * (warped + warped.transpose());
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Basic functionality
 // ─────────────────────────────────────────────────────────────────
@@ -101,6 +123,68 @@ TEST(IMMFilter, ResetClearsState) {
 
     imm.reset();
     EXPECT_FALSE(imm.is_initialized());
+}
+
+TEST(IMMFilter, ResetPreservesConfiguredMeasurementNoise) {
+    IMMFilter tuned;
+    IMMFilter baseline;
+
+    MeasCovMat wide_R = MeasCovMat::Identity() * 10000.0f;
+    tuned.set_measurement_noise(wide_R);
+    tuned.reset();
+
+    MeasVec z0;
+    z0 << 50.0f, 50.0f, 30.0f, 30.0f;
+    tuned.init(z0);
+    baseline.init(z0);
+
+    MeasVec jumped;
+    jumped << 200.0f, 50.0f, 30.0f, 30.0f;
+    static_cast<void>(tuned.update(jumped));
+    static_cast<void>(baseline.update(jumped));
+
+    EXPECT_LT(tuned.get_state()(0), baseline.get_state()(0) - 10.0f);
+}
+
+TEST(IMMFilter, ApplyGmcWarpsCombinedCovariance) {
+    IMMFilter imm;
+
+    StateVec x = StateVec::Zero();
+    x << 10.0f, 20.0f, 30.0f, 40.0f, 3.0f, -2.0f, 0.5f, -0.25f, 0.1f, -0.2f;
+
+    StateMat P = StateMat::Zero();
+    P(0, 0) = 4.0f;
+    P(1, 1) = 9.0f;
+    P(2, 2) = 16.0f;
+    P(3, 3) = 25.0f;
+    P(4, 4) = 36.0f;
+    P(5, 5) = 49.0f;
+    P(0, 2) = 1.5f;  P(2, 0) = 1.5f;
+    P(1, 3) = -2.0f; P(3, 1) = -2.0f;
+    P(4, 5) = 3.0f;  P(5, 4) = 3.0f;
+
+    ModelProb mu;
+    mu << 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f;
+    imm.restore_from(x, P, mu);
+
+    HomMat H = HomMat::Identity();
+    H(0, 0) = 1.2f;
+    H(0, 1) = 0.1f;
+    H(0, 2) = 5.0f;
+    H(1, 0) = -0.2f;
+    H(1, 1) = 0.9f;
+    H(1, 2) = -3.0f;
+
+    const StateMat expected = imm_gmc_expected_covariance(P, H);
+    imm.apply_gmc(H);
+
+    const StateMat& got = imm.get_covariance();
+    for (int32_t r = 0; r < kStateDim; ++r) {
+        for (int32_t c = 0; c < kStateDim; ++c) {
+            EXPECT_NEAR(got(r, c), expected(r, c), 1e-4f)
+                << "Mismatch at (" << r << ", " << c << ")";
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────

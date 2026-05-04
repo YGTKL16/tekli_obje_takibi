@@ -1,0 +1,42 @@
+# Optuna-tuned unified IMM parameters (22D, LODO CV)
+# Saved: Optuna  FinalScore=0.7450
+# AI-only=0.7596  Default-IMM=0.7246  Optuna=0.7450  C1=0.7411
+# Delta vs AI-only: -0.0146
+# Trials: 500, Sequences: 89, Folds: 5
+
+imm:
+  q_scale: 59.719366
+  measurement_noise:
+    r_pos_scale: 0.804892
+    r_size_scale: 0.185992
+  transition_matrix:
+    pi_persist: 0.9583
+
+decision:
+  conf_threshold: 0.181074
+  coast_threshold: 0.308520
+  max_coast_frames: 24
+
+blend:
+  alpha_conf_lo: 0.196159
+  alpha_conf_hi: 0.572474
+
+hygiene:
+  reinit_after: 3
+  max_area_frac: 0.358334
+  max_center_jump_frac: 0.588660
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 4.380193
+
+smart_intervention:
+  conf_bypass_threshold: 0.732372
+  innovation_threshold: 2.754474
+  sm_conf_threshold: 0.205067
+  sm_max_coast: 71
+  maneuver_threshold: 0.709542
+  maneuver_bypass_boost: 0.116008
+
+soft_fusion:
+  alpha_gate_k_conf: 2.259880
+  alpha_gate_lambda: 0.059607
+  reacq_r_decay: 0.456460

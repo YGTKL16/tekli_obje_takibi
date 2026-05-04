@@ -67,3 +67,28 @@ def test_load_runtime_config_reads_yaml_file(tmp_path):
     assert params["conf_threshold"] == pytest.approx(0.18)
     assert params["sm_conf_threshold"] == pytest.approx(0.18)
     assert params["conf_bypass_threshold"] == pytest.approx(0.15)
+
+
+def test_mixformerv2_block_normalizes_to_runtime_params():
+    params = normalize_runtime_config({
+        "mixformerv2": {
+            "enabled": True,
+            "checkpoint": "models/MixFormerV2/models/mixformerv2_small.pth.tar",
+            "config_yaml": "models/MixFormerV2/experiments/mixformer2_vit_online/224_depth4_mlp1_score.yaml",
+            "repo_root": "models/MixFormerV2",
+            "search_factor": 4.55,
+            "fusion": {
+                "enabled": True,
+                "weight": 0.4,
+                "min_confidence": 0.25,
+                "confidence_weighted": False,
+            },
+        },
+    })
+
+    assert params["mixformerv2_enabled"] is True
+    assert params["mixformerv2_fusion_enabled"] is True
+    assert params["mixformerv2_fusion_weight"] == pytest.approx(0.4)
+    assert params["mixformerv2_fusion_min_confidence"] == pytest.approx(0.25)
+    assert params["mixformerv2_fusion_confidence_weighted"] is False
+    assert params["mixformerv2_search_factor"] == pytest.approx(4.55)

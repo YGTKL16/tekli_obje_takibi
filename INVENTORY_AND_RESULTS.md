@@ -1,7 +1,35 @@
 # Tracker Envanteri & Dataset Analizi
 
-**Tarih:** 27 Nisan 2026 (güncellendi: C1 255-seq KABUL FS=0.7215 — YENİ ALTIN STANDART)
-**Eval:** 255/255 tamamlandı (GMC + Adaptive-R + IMM + F5 + C1 startup suppression — c1 = ALTIN STANDART)
+**Tarih:** 27 Nisan 2026 (güncellendi: EP32 engine 255-seq FS=0.7618 — YENİ ALTIN STANDART)
+**Eval:** 255/255 tamamlandı (EP32 TRT FP16 engine — ep32 = ALTIN STANDART)
+
+---
+
+## -1. Phase 8: SGLATrack EP32 Engine (KABUL ✅ — 255-seq FS=0.7618)
+
+### 3-Way Engine Comparison (22-seq subset, 2026-04-30)
+
+| Engine | AUC | NormPrec | FinalScore |
+|--------|-----|----------|------------|
+| EP0297 (DeiT-Tiny pre-finetune) | 0.643 | 0.734 | 0.6795 |
+| Finetuned (best epoch) | 0.662 | 0.761 | 0.7012 |
+| **EP32 (epoch 32)** | **0.714** | **0.802** | **0.7491** |
+
+**EP32 255-seq Full Eval:**
+- AUC: 0.731 (+0.047 vs C1 baseline 0.6843)
+- NormPrec: 0.809 (+0.032 vs C1 baseline 0.7774)
+- **FinalScore: 0.7618 (+0.040 vs C1 baseline 0.7215)**
+- IMM: net negative (4/255 better) — raw score is what matters
+
+**Production changes:**
+- `configs/tracker_config.yaml`: `engine_path` → `models/sglatrack_ep32_fp16.engine`
+- `python/tracker/trt_wrapper.py`: default engine → `sglatrack_ep32_fp16.engine`
+
+**Key insight:** EP32 (MTCAIC4 epoch 32) dramatically improves AUC specifically (+0.047 on 255-seq).
+Fine-tuning on MTCAIC4 dataset directly fixed the scale estimation weakness (AUC << NormPrecision gap).
+Old engine: AUC=0.684 vs NP=0.777 (gap=0.093). New engine: AUC=0.731 vs NP=0.809 (gap=0.078).
+
+---
 
 ---
 

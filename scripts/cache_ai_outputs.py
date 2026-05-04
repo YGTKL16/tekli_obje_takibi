@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Cache AI (TRT) outputs for all SUBSET sequences.
+"""Cache AI (TRT) outputs for tracking sequences.
 
 Runs TRTTrackWrapper once per sequence, saves (ai_bboxes, confs, gt, init_bbox,
 frame_w, frame_h) as NPZ.  Subsequent tuning scripts replay filter logic on
 cached data without TRT inference.
 
 Usage:
-    python scripts/cache_ai_outputs.py                   # default cache dir
-    python scripts/cache_ai_outputs.py --cache-dir /tmp   # custom dir
-    python scripts/cache_ai_outputs.py --force             # overwrite existing
+    python scripts/cache_ai_outputs.py                   # cache hardcoded SUBSET (24 seq)
+    python scripts/cache_ai_outputs.py --split train     # cache all 255 train sequences
+    python scripts/cache_ai_outputs.py --cache-dir /tmp  # custom dir
+    python scripts/cache_ai_outputs.py --force           # overwrite existing
 """
 
 import argparse
@@ -22,7 +23,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "build"))
 import cv2
 import numpy as np
 from tracker.data_utils import DATA_ROOT, load_gt, load_manifest, parse_bbox_line
-from tracker.trt_wrapper import TRTTrackWrapper
 
 SUBSET = [
     "dataset1/plane", "dataset1/surfer", "dataset1/volleyball",
@@ -116,32 +116,65 @@ def cache_sequence(tracker, seq_id, seq_info, manifest, out_dir, force=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cache AI outputs for SUBSET sequences")
+    parser = argparse.ArgumentParser(description="Cache AI outputs for tracking sequences")
     parser.add_argument("--cache-dir", default=os.path.join(
         os.path.dirname(__file__), "..", "cache", "ai_outputs"))
     parser.add_argument("--force", action="store_true", help="Overwrite existing caches")
     parser.add_argument("--engine", default=None, help="TRT engine path")
+    parser.add_argument("--backend", default="tensorrt", choices=["tensorrt", "pytorch"],
+                        help="Inference backend (default: tensorrt)")
+    parser.add_argument("--checkpoint", default=None,
+                        help="Path to .pth.tar (for --backend pytorch)")
+    parser.add_argument("--split", default=None, choices=["train", "public_lb"],
+                        help="Cache entire manifest split instead of hardcoded SUBSET")
     args = parser.parse_args()
 
     out_dir = os.path.abspath(args.cache_dir)
     os.makedirs(out_dir, exist_ok=True)
 
     manifest = load_manifest()
-    tracker = TRTTrackWrapper(engine_path=args.engine)
 
-    print(f"Caching {len(SUBSET)} sequences → {out_dir}")
+    if args.split in ("train", "public_lb"):
+        seq_list = sorted(manifest[args.split].keys())
+        print(f"[INFO] --split {args.split}: {len(seq_list)} sequences")
+    else:
+        seq_list = SUBSET
+        print(f"[INFO] Using hardcoded SUBSET: {len(seq_list)} sequences")
+
+    if args.backend == "pytorch":
+        from tracker.sglatrack_wrapper import SGLATrackWrapper  # pyright: ignore[reportMissingImports]
+        tracker = SGLATrackWrapper(checkpoint_path=args.checkpoint, association_enabled=False)
+        print(f"[INFO] Backend: pytorch, checkpoint={args.checkpoint}")
+    else:
+        from tracker.trt_wrapper import TRTTrackWrapper  # pyright: ignore[reportMissingImports]
+        tracker = TRTTrackWrapper(engine_path=args.engine)
+        print(f"[INFO] Backend: tensorrt, engine={args.engine}")
+
+    print(f"Caching {len(seq_list)} sequences → {out_dir}")
     t0 = time.time()
     cached = 0
 
-    for seq_id in SUBSET:
-        seq_info = manifest["train"][seq_id]
+    split_key = args.split if args.split in ("train", "public_lb") else "train"
+    for seq_id in seq_list:
+        seq_info = manifest[split_key].get(seq_id)
+        if seq_info is None:
+            # Fall back: search all splits
+            seq_info = None
+            for sk, ss in manifest.items():
+                if isinstance(ss, dict) and seq_id in ss:
+                    seq_info = ss[seq_id]
+                    break
+        if seq_info is None:
+            print(f"  [WARN] {seq_id} not found in manifest, skipping")
+            continue
         result = cache_sequence(tracker, seq_id, seq_info, manifest, out_dir,
                                 force=args.force)
         if result:
             cached += 1
 
     elapsed = time.time() - t0
-    print(f"\nDone: {cached}/{len(SUBSET)} cached in {elapsed:.1f}s")
+    print(f"\nDone: {cached}/{len(seq_list)} cached in {elapsed:.1f}s "
+          f"({elapsed/60:.1f} min)")
 
 
 if __name__ == "__main__":

@@ -611,6 +611,7 @@ def run_sequence(tracker, seq_id, seq_info, manifest, use_kf, kf_mode="baseline"
                     vel_innov_ratio_gate=float(fp.get("vel_innov_ratio_gate", 0.0)),
                     vel_innov_min_speed=float(fp.get("vel_innov_min_speed", 1.0)),
                     vel_innov_min_innov=float(fp.get("vel_innov_min_innov", 0.0)),
+                    conf_mahal_escape_thr=float(fp.get("conf_mahal_escape_thr", 0.0)),
                     accept_bbox_raw=bool(fp.get("accept_bbox_raw", False)),
                 )
                 bbox = step.bbox
@@ -900,6 +901,8 @@ def main():
     parser = argparse.ArgumentParser(description="A/B test: AI-only vs AI+IMM")
     parser.add_argument("--all", action="store_true",
                         help="Run on ALL 255 train sequences (default: 20 subset)")
+    parser.add_argument("--engine", default=None, metavar="ENGINE_PATH",
+                        help="TensorRT engine path override (default: models/sglatrack_fp16.engine)")
     parser.add_argument("--mode", default="baseline",
                         choices=["baseline", "open_loop", "coast_only", "velocity_shift", "ai_lead"],
                         help="KF feedback mode")
@@ -996,7 +999,7 @@ def main():
     print(", ".join(tags))
 
     manifest = load_manifest()
-    tracker = TRTTrackWrapper()
+    tracker = TRTTrackWrapper(engine_path=args.engine) if args.engine else TRTTrackWrapper()
 
     if args.seq:
         seq_ids = args.seq

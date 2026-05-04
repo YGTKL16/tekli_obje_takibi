@@ -338,7 +338,18 @@ def step_guided_imm(
     vel_innov_ratio_gate: float = 0.0,    # force coast when ratio > this; 0=disabled
     vel_innov_min_speed: float = 1.0,     # floor for kf_speed denominator (px/frame)
     vel_innov_min_innov: float = 0.0,     # minimum absolute center innov (px) to fire gate; 0=no min
-    accept_bbox_raw: bool = False,        # output raw AI obs (not KF state) on accepted frames
+    # When conf >= conf_mahal_escape_thr > 0 and reject_streak == 0, skip the
+    # Mahalanobis gate and accept the measurement. Handles KF drift after a long
+    # coast where d² spikes but AI is genuinely tracking the target (e.g. Car_video_2
+    # frames 211-216: conf=0.73, d²=31-130 after 76-frame drift).
+    # 0.0 = disabled (default).
+    conf_mahal_escape_thr: float = 0.0,
+    # When True, output the raw AI observation bbox on accepted frames instead of
+    # the KF-blended state. KF is still updated for next-frame prediction. Eliminates
+    # the lag introduced by large R_pos (r_pos_scale) that biases the accept output
+    # toward the KF prediction (e.g. horse_4 accepted frames: ai_iou=0.88 → final_iou=0.60).
+    # False = legacy KF-state output (default).
+    accept_bbox_raw: bool = False,
 ) -> IMMPolicyStep:
     """Judge the observed bbox and produce the single final filter output."""
     predicted = np.asarray(predicted_state, dtype=np.float32).flatten()
@@ -536,17 +547,31 @@ def step_guided_imm(
         # consecutive rejection the KF prediction has likely already diverged
         # from the target — continuing to gate makes the failure permanent.
         if measurement_sane and kf is not None and reject_streak < _eff_bypass_after:
-            mahal_ok = bool(
-                decision.is_measurement_mahalanobis_ok(
-                    observation_arr,
-                    kf,
-                    chi2_threshold=mahal_chi2_threshold,
+            # conf_mahal_escape: when AI is confident on the *first* potential
+            # rejection (streak=0) AND the KF has been actively coasting
+            # (coast_count > 0), skip the chi² gate. Handles KF drift after
+            # a long coast where d² spikes yet the AI is reliably tracking.
+            # Gated on coast_count > 0 to prevent accepting ID-switch candidates
+            # during normal in-contact tracking.
+            if (
+                conf_mahal_escape_thr > 0.0
+                and confidence >= conf_mahal_escape_thr
+                and reject_streak == 0
+                and coast_count > 0
+            ):
+                mahal_confirmed = True  # trust AI, skip chi² check
+            else:
+                mahal_ok = bool(
+                    decision.is_measurement_mahalanobis_ok(
+                        observation_arr,
+                        kf,
+                        chi2_threshold=mahal_chi2_threshold,
+                    )
                 )
-            )
-            measurement_sane = mahal_ok
-            mahal_confirmed = mahal_ok   # chi² explicitly confirmed → skip IoU below
-            if not mahal_ok:
-                sanity_reason = "mahal"
+                measurement_sane = mahal_ok
+                mahal_confirmed = mahal_ok   # chi² explicitly confirmed → skip IoU below
+                if not mahal_ok:
+                    sanity_reason = "mahal"
 
     should_coast = bool(decision.should_coast(confidence))
 
@@ -638,15 +663,16 @@ def step_guided_imm(
             state = np.array(kf.update(z_soft, float(eff_conf ** r_exponent))).flatten()
         else:
             state = np.array(kf.update(z_soft)).flatten()
-        # accept_bbox_raw: output the raw AI observation directly instead of the
-        # Kalman-smoothed state.  KF is still updated (state used for prediction).
-        # This eliminates size-smoothing lag when the target changes apparent size
-        # rapidly (e.g. car approaching camera), without affecting coasting benefit.
-        if accept_bbox_raw and observation_arr is not None:
+        # accept_bbox_raw: output the raw AI observation instead of KF-blended state.
+        # CRITICAL: next_last_good MUST use pred_bbox(state) (KF state) regardless,
+        # because it feeds the F5 closed-loop search window. Using raw obs here would
+        # corrupt the search window and cause catastrophic drift (architecture note).
+        if accept_bbox_raw:
             bbox = _as_bbox_list(observation_arr)
+            next_last_good = pred_bbox(state)  # F5 feedback stays on KF state
         else:
             bbox = pred_bbox(state)
-        next_last_good = bbox
+            next_last_good = bbox
         next_reject_streak = 0
     else:
         next_reject_streak += 1

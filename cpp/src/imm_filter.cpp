@@ -290,6 +290,10 @@ void IMMFilter::update_all(const MeasVec& z) noexcept {
             // Trap 7: S not PD — add regularisation and retry
             S += kCovRegEps * MeasCovMat::Identity();
             const Eigen::LLT<MeasCovMat> llt2(S);
+            if (llt2.info() != Eigen::Success) {
+                // Both attempts failed — keep predicted state for this model.
+                continue;
+            }
             const KalmanGain K = P_[m] * H_.transpose()
                 * llt2.solve(MeasCovMat::Identity());
             x_[m] = x_[m] + K * y;
@@ -398,8 +402,14 @@ const StateVec& IMMFilter::predict() noexcept {
             ar_boost = std::min(1.0F + ar_diff * ar_q_sensitivity_, ar_q_boost_cap_);
         }
         const bool apply_ar_boost = (ar_boost > 1.001F);
+        // F7: stash baseline Q and restore exact bytes after predict, instead of
+        // multiply-then-divide round-trip which loses precision over time.
+        StateMat Q_saved[kNumModels];
         if (apply_ar_boost) {
-            for (int32_t i = 0; i < kNumModels; ++i) { Q_[i] *= ar_boost; }
+            for (int32_t i = 0; i < kNumModels; ++i) {
+                Q_saved[i] = Q_[i];
+                Q_[i] = Q_[i] * ar_boost;
+            }
         }
 
         compute_mixing_probabilities();
@@ -409,7 +419,7 @@ const StateVec& IMMFilter::predict() noexcept {
         predicted_ = true;
 
         if (apply_ar_boost) {
-            for (int32_t i = 0; i < kNumModels; ++i) { Q_[i] /= ar_boost; }
+            for (int32_t i = 0; i < kNumModels; ++i) { Q_[i] = Q_saved[i]; }
         }
     }
     return x_combined_;
@@ -460,7 +470,24 @@ const StateVec& IMMFilter::update(const MeasVec& z) noexcept {
 void IMMFilter::reset() noexcept {
     initialized_ = false;
     predicted_ = false;
-    build_matrices();
+    gmc_failed_ = false;
+    prev_meas_ar_ = 0.0F;
+
+    mu_ << 1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F;
+    for (int32_t m = 0; m < kNumModels; ++m) {
+        x_[m] = StateVec::Zero();
+        P_[m] = StateMat::Identity() * 10.0F;
+        x_mixed_[m] = StateVec::Zero();
+        P_mixed_[m] = StateMat::Identity() * 10.0F;
+        log_likelihood_[m] = 0.0F;
+        c_bar_[m] = 1.0F / static_cast<float>(kNumModels);
+        for (int32_t i = 0; i < kNumModels; ++i) {
+            mu_mix_[i][m] = 1.0F / static_cast<float>(kNumModels);
+        }
+    }
+
+    x_combined_ = StateVec::Zero();
+    P_combined_ = StateMat::Identity() * 10.0F;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -540,6 +567,33 @@ void warp_state_inplace(StateVec& x, const HomMat& H) noexcept {
     x(5) = qyn - cy_n;
 }
 
+void warp_covariance_inplace(StateMat& P, const HomMat& H) noexcept {
+    const float a = H(0, 0);
+    const float b = H(0, 1);
+    const float c = H(1, 0);
+    const float d = H(1, 1);
+
+    StateMat J = StateMat::Zero();
+    // Position rows: current IMM GMC warp keeps w/h unchanged, so the Jacobian
+    // uses the same centre-plus-size derivation with identity size scaling.
+    J(0, 0) = a;  J(0, 1) = b;  J(0, 2) = 0.5F * (a - 1.0F);  J(0, 3) = 0.5F * b;
+    J(1, 0) = c;  J(1, 1) = d;  J(1, 2) = 0.5F * c;           J(1, 3) = 0.5F * (d - 1.0F);
+    // Size remains unchanged in IMM GMC path.
+    J(2, 2) = 1.0F;
+    J(3, 3) = 1.0F;
+    // Velocity follows the 2x2 affine block.
+    J(4, 4) = a;  J(4, 5) = b;
+    J(5, 4) = c;  J(5, 5) = d;
+    // Size velocity and acceleration remain unchanged in IMM GMC path.
+    J(6, 6) = 1.0F;
+    J(7, 7) = 1.0F;
+    J(8, 8) = 1.0F;
+    J(9, 9) = 1.0F;
+
+    P = J * P * J.transpose();
+    P = 0.5F * (P + P.transpose());
+}
+
 }  // namespace
 
 const StateVec& IMMFilter::update(const MeasVec& z, float confidence) noexcept {
@@ -552,9 +606,11 @@ const StateVec& IMMFilter::update(const MeasVec& z, float confidence) noexcept {
     const float eff_conf = std::max(confidence, 0.001F);
 
     const MeasCovMat R_saved = R_;
-    // D2A: cap R inflation to prevent unbounded noise at very low confidence.
-    // multiplier = min(floor/conf, cap); floor acts as neutral point, cap bounds explosion.
-    const float multiplier = std::min(adaptive_r_floor_ / eff_conf, adaptive_r_cap_);
+    // F8: clamp multiplier to [1.0, cap] for consistency with KalmanFilter::update
+    // (Bug 3 fix). Never deflate R below baseline at high confidence — deflation
+    // makes the filter overconfident in noisy measurements.
+    const float raw = adaptive_r_floor_ / eff_conf;
+    const float multiplier = std::min(std::max(raw, 1.0F), adaptive_r_cap_);
     R_ = R_saved * multiplier;
     static_cast<void>(update(z));
     R_ = R_saved;
@@ -568,8 +624,10 @@ void IMMFilter::apply_gmc(const HomMat& H) noexcept {
 
     for (int32_t m = 0; m < kNumModels; ++m) {
         warp_state_inplace(x_[m], H);
+        warp_covariance_inplace(P_[m], H);
     }
     warp_state_inplace(x_combined_, H);
+    warp_covariance_inplace(P_combined_, H);
 }
 
 void IMMFilter::set_gmc_failed(bool failed) noexcept {
@@ -613,13 +671,11 @@ void IMMFilter::build_singer_fq() noexcept {
     const float s2a   = std::max(singer_sigma2_, 1e-6F);
     const float beta  = std::exp(-alpha * kDt);
 
-    // Pre-computed powers (AV Rule 151 — named, not inlined)
+    // Pre-computed powers (AV Rule 151 — named, not inlined).  a4/a5/b2 are
+    // computed only in double precision below for the Q block; F-matrix only
+    // needs a1 and a2.
     const float a1 = alpha;
     const float a2 = a1 * a1;
-    const float a3 = a2 * a1;
-    const float a4 = a3 * a1;
-    const float a5 = a4 * a1;
-    const float b2 = beta * beta;
 
     // ── F_[kModelSinger]: rebuild from scratch ─────────────────
     F_[kModelSinger] = StateMat::Identity();
@@ -643,23 +699,73 @@ void IMMFilter::build_singer_fq() noexcept {
 
     // ── Q_[kModelSinger]: physically derived cross-covariance ─────
     Q_[kModelSinger] = StateMat::Zero();
-    const float q_pp = s2a * (2.0F*a3*kDt - 3.0F + 4.0F*beta - b2) / (2.0F*a5);
-    const float q_pv = s2a * (1.0F - 2.0F*alpha*kDt*beta - b2)      / (2.0F*a4);
-    const float q_vv = s2a * (1.0F - b2)                             / (2.0F*a3);
-    const float q_aa = s2a * (1.0F - b2)                             / a1;
+    // Bar-Shalom "Estimation with Applications…" eq. 8.2.3-13 (Singer model
+    // discretised continuous-time process noise).  All six unique entries:
+    //
+    //   q_pp = σ²/(2α⁵) · [1 − β² + 2αT + (2/3)(αT)³ − 2(αT)² − 4αT·β]
+    //   q_pv = σ²/(2α⁴) · [1 + β² − 2β + 2αT·β − 2αT + (αT)²]      (= 1−β)² + αT(αT−2(1−β))
+    //   q_pa = σ²/(2α³) · [1 − β² − 2αT·β]
 
-    // x-axis spatial cross terms: pos=0, vel=4, acc=8
+    //   q_vv = σ²/(2α³) · [4β − 3 − β² + 2αT]
+    //   q_va = σ²/(2α²) · [1 + β² − 2β]   = σ²/(2α²)·(1−β)²
+    //   q_aa = σ²/(2α)  · [1 − β²]
+    //
+    // The previous code had q_pp set to the q_vv numerator (negative for αT<1)
+    // and used a degenerate diagonal — the new form is the full 3×3 PSD block
+    // per spatial axis.  Compute in double for numerical headroom because the
+    // αT<1 regime stresses single-precision (Trap 9).
+    const double dT     = static_cast<double>(kDt);
+    const double da     = static_cast<double>(alpha);
+    const double ds2    = static_cast<double>(s2a);
+    const double db     = std::exp(-da * dT);
+    const double db2    = db * db;
+    const double daT    = da * dT;
+    const double da2    = da * da;
+    const double da3    = da2 * da;
+    const double da4    = da3 * da;
+    const double da5    = da4 * da;
+    const double one_mb = 1.0 - db;
+
+    const double q_pp_d = ds2 * (1.0 - db2 + 2.0*daT
+                                 + (2.0/3.0)*daT*daT*daT
+                                 - 2.0*daT*daT
+                                 - 4.0*daT*db) / (2.0 * da5);
+    const double q_pv_d = ds2 * (one_mb*one_mb + daT*(daT - 2.0*one_mb))
+                          / (2.0 * da4);
+    const double q_pa_d = ds2 * (1.0 - db2 - 2.0*daT*db) / (2.0 * da3);
+    const double q_vv_d = ds2 * (4.0*db - 3.0 - db2 + 2.0*daT) / (2.0 * da3);
+    const double q_va_d = ds2 * (one_mb * one_mb)            / (2.0 * da2);
+    const double q_aa_d = ds2 * (1.0 - db2)                  / (2.0 * da);
+
+    // PSD-floor at 0 (Trap 5 — guard against floating-point cancellation
+    // turning a theoretically PSD entry slightly negative).
+    const float q_pp = static_cast<float>(std::max(q_pp_d, 0.0));
+    const float q_pv = static_cast<float>(q_pv_d);
+    const float q_pa = static_cast<float>(q_pa_d);
+    const float q_vv = static_cast<float>(std::max(q_vv_d, 0.0));
+    const float q_va = static_cast<float>(q_va_d);
+    const float q_aa = static_cast<float>(std::max(q_aa_d, 0.0));
+
+    // x-axis spatial 3×3 block: pos=0, vel=4, acc=8
     Q_[kModelSinger](0, 0) = q_pp;
     Q_[kModelSinger](0, 4) = q_pv;
     Q_[kModelSinger](4, 0) = q_pv;
+    Q_[kModelSinger](0, 8) = q_pa;
+    Q_[kModelSinger](8, 0) = q_pa;
     Q_[kModelSinger](4, 4) = q_vv;
+    Q_[kModelSinger](4, 8) = q_va;
+    Q_[kModelSinger](8, 4) = q_va;
     Q_[kModelSinger](8, 8) = q_aa;
 
-    // y-axis spatial cross terms: pos=1, vel=5, acc=9
+    // y-axis spatial 3×3 block: pos=1, vel=5, acc=9
     Q_[kModelSinger](1, 1) = q_pp;
     Q_[kModelSinger](1, 5) = q_pv;
     Q_[kModelSinger](5, 1) = q_pv;
+    Q_[kModelSinger](1, 9) = q_pa;
+    Q_[kModelSinger](9, 1) = q_pa;
     Q_[kModelSinger](5, 5) = q_vv;
+    Q_[kModelSinger](5, 9) = q_va;
+    Q_[kModelSinger](9, 5) = q_va;
     Q_[kModelSinger](9, 9) = q_aa;
 
     // Size axes: simple diagonal (no physical maneuver model for w/h)

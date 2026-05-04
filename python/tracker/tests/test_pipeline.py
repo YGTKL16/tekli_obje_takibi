@@ -128,9 +128,9 @@ class TestPipeline:
             )
             p.run()
 
-        # ai_lead mode: set_state is NOT called during normal tracking (high conf)
-        # AI manages its own search window; KF only steers during coasting.
-        ai.set_state.assert_not_called()
+        # F5 closed-loop feedback: set_state is called every frame to feed
+        # the KF-blended bbox back to the SGLATrack search window.
+        ai.set_state.assert_called()
 
     @patch("tracker.pipeline.HAS_CV2", True)
     @patch("tracker.pipeline.cv2")
@@ -167,8 +167,8 @@ class TestPipeline:
             )
             p.run()
 
-        # ai_lead: 1 coasting frame → reject_streak=1 (< 5) → no rescue yet
-        ai.set_state.assert_not_called()
+        # F5 closed-loop feedback: set_state is called every frame.
+        ai.set_state.assert_called()
 
     @patch("tracker.pipeline.HAS_CV2", True)
     @patch("tracker.pipeline.cv2")
@@ -210,8 +210,8 @@ class TestPipeline:
         # Phase 1 — Great Rescue: after streak>=5 + should_coast, ai.init is called
         # (at least once for the rescue, plus the initial init at frame 0).
         assert ai.init.call_count >= 2
-        # set_state is never used in ai_lead mode — rescue uses init() instead.
-        ai.set_state.assert_not_called()
+        # F5 closed-loop feedback: set_state is called every frame (even during coasting).
+        ai.set_state.assert_called()
 
     @patch("tracker.pipeline.HAS_CV2", True)
     @patch("tracker.pipeline.cv2")

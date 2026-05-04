@@ -94,6 +94,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-pytorch", action="store_true",
                     help="Also run PyTorch FP32 backend (slow)")
+    ap.add_argument("--checkpoint", default=None,
+                    help="SGLATrack checkpoint for --include-pytorch")
     ap.add_argument("--engines", nargs="+", default=None,
                     help="Engine paths to compare (default: fp16 + mixed)")
     args = ap.parse_args()
@@ -135,7 +137,7 @@ def main():
             tracker = TRTTrackWrapper(engine_path=engine_path)
         else:
             from tracker.sglatrack_wrapper import SGLATrackWrapper
-            tracker = SGLATrackWrapper()
+            tracker = SGLATrackWrapper(checkpoint_path=args.checkpoint)
 
         aucs, nps = [], []
         t0 = time.time()

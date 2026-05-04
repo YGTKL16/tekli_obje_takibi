@@ -1,0 +1,121 @@
+# M1: Velocity Anchor — LOST-State Search Window Drift Fix
+#
+# Kaizen Trial | 2026-04-30 | Baseline: c1_startup_classifier.yaml (22-seq FS_imm=0.7215)
+#
+# Problem: 14/88 public_lb sequences have AUC < 0.40. All share the same signature:
+#   COASTING → LOST → search window drifts away with KF velocity model →
+#   AI keeps looking in wrong place → recovery impossible.
+#   Worst offenders: group2_1 (0.140), sheeps_2 (0.207), uav7 (0.223), car6_2 (0.291)
+#   max_zero_run up to 1077 frames.
+#
+# Solution (M1): Enable velocity_anchor_max to clamp vx/vy in AI search guidance
+#   copy during coasting. KF internal state is NOT touched — only the guidance
+#   vector passed to observe_with_guidance() is clamped.
+#   velocity_anchor_max=5.0 px/frame → 44-frame coast max drift = 220px.
+#
+# Safe because:
+#   - Only triggers when reject_streak > 0 (AI already failing)
+#   - Clamps guidance copy only (L-inf, per-axis), KF state unchanged
+#   - Fast-moving targets: reject_streak stays 0 when AI is confident → no effect
+#
+# All other params: IDENTICAL to c1_startup_classifier.yaml
+
+# ── C1 startup classifier params ─────────────────────────────────────────────
+f5_startup_window: 30
+f5_startup_vel_thr: 0.10
+f5_startup_full_thr: 0.25
+
+# ── M1: velocity anchor ───────────────────────────────────────────────────────
+velocity_anchor_max: 5.0
+
+# ── All params below: IDENTICAL to c1_startup_classifier.yaml ────────────────
+
+imm:
+  q_scale: 31.113513
+  measurement_noise:
+    r_pos_scale: 44.953786
+    r_size_scale: 2.107025
+  transition_matrix:
+    pi_persist: 0.9600
+
+decision:
+  conf_threshold: 0.186309
+  coast_threshold: 0.140301
+  max_coast_frames: 44
+
+blend:
+  alpha_conf_lo: 0.373544
+  alpha_conf_hi: 0.845429
+
+hygiene:
+  reinit_after: 10
+  max_area_frac: 0.345940
+  max_center_jump_frac: 0.511044
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 7.099779
+
+smart_intervention:
+  conf_bypass_threshold: 0.740469
+  innovation_threshold: 1.454772
+  sm_conf_threshold: 0.155357
+  sm_max_coast: 69
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+adaptive_r:
+  enabled: true
+  floor: 0.01
+  r_exponent: 2.0
+
+singer:
+  alpha: 1.0
+  sigma2_a: 25.0
+
+mahalanobis:
+  chi2_threshold: 23.51
+  bypass_after: 5
+  bypass_conf_thr: 0.70
+  bypass_vel_thr: 3.0
+  bypass_after_fast: 2
+  bypass_after_slow: 5
+  r_pos_base: 44.953786
+  r_size_base: 21.07025
+
+ai:
+  skip_when_confident: false
+  max_consecutive_skips: 2
+  singer_skip_thr: 0.35
+  cv_stable_thr: 0.70
+  cv_conf_min: 0.65
+  search_scale_boost: 0.0
+  conf_refresh_low:   0.35
+  conf_refresh_high:  0.65
+  refresh_patience:   8
+  refresh_decline_thr: 0.04
+  refresh_bypass_lookback: 0
+  refresh_min_bbox_area: 0.0
+  refresh_min_interval: 0
+  refresh_small_area_thr: 220.0
+  refresh_small_interval: 99999
+  rescue_min_area: 220.0
+  f5_feedback: true
+  f5_scale_guard: 1.5
+
+oru:
+  enabled: true
+  n_min: 5
+  n_max: 30
+  conf_reentry_min: 0.50
+  velocity_cv_max: 0.5
+  virtual_conf: 0.4
+  skip_if_singer_dom: true
+  singer_dom_thr: 0.7
+  ring_buffer_size: 35
+
+chaos:
+  enabled: false
+  window: 10
+  chaos_thr: 0.08
+  chaos_max: 0.20
+  min_chaos_conf_factor: 0.15
+  min_samples: 5

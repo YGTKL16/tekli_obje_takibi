@@ -126,15 +126,35 @@ def replay_sequence(cache_path: str, params: dict) -> list:
     singer_skip_thr = float(params.get("singer_skip_thr", 0.35))
     cv_stable_thr   = float(params.get("cv_stable_thr",   0.70))
     cv_conf_min     = float(params.get("cv_conf_min",     0.65))
+    # Singer physics (Bug 2 + 11 fix): build_singer_fq() in C++ now uses the
+    # full Bar-Shalom Q with proper p–v–a cross terms (PSD across all α, σ²);
+    # expose α and σ² to Optuna so the Singer model is tuned on its physical
+    # knobs instead of a diagonal Q that destroyed IMM diversity.
+    singer_alpha   = float(params.get("singer_alpha",   0.10))
+    singer_sigma2  = float(params.get("singer_sigma2",  1.0))
+    # Maneuver-pi (D1) detector (Bug 6 fix): exposed to replay so Optuna can tune it.
+    maneuver_pi_enabled       = bool(params.get("maneuver_pi_enabled", False))
+    maneuver_pi_thr           = float(params.get("maneuver_pi_thr", 9.0))
+    maneuver_pi_persist       = float(params.get("maneuver_pi_persist", 0.72))
+    maneuver_pi_singer_boost  = float(params.get("maneuver_pi_singer_boost", 0.20))
+    normal_pi_persist         = float(params.get("normal_pi_persist", pi_persist))
+    vel_gate_min_speed        = float(params.get("vel_gate_min_speed", 0.0))
+    vel_gate_cos_thr          = float(params.get("vel_gate_cos_thr", 0.85))
 
     # Create filter and decision maker
     kf = tracker_cpp.IMMFilter()
     q_size_vel_scale = float(params.get("q_size_vel_scale", 1.0))
-    for m in range(3):
+    # Bug 2 fix: only set CV (0) and CA (1) Qs. Singer's Q is the physically
+    # derived cross-covariance built by build_singer_fq() inside C++ — overwriting
+    # it with a diagonal kills the IMM diversity that justifies the 3-model setup.
+    for m in (0, 1):
         Q = _build_model_q(m, q_scale)
         Q[6, 6] *= q_size_vel_scale  # vw: scale velocity noise
         Q[7, 7] *= q_size_vel_scale  # vh: scale velocity noise
         kf.set_model_process_noise(m, Q)
+    # Singer: configure via physics knobs; build_singer_fq() rebuilds Q with
+    # proper p–v–a cross terms. q_scale also rescales Singer's sigma².
+    kf.set_singer_params(float(singer_alpha), float(singer_sigma2 * q_scale))
     kf.set_measurement_noise(_build_measurement_r(r_pos_scale, r_size_scale))
     kf.set_transition_matrix(_build_transition_matrix(pi_persist))
 
@@ -207,6 +227,11 @@ def replay_sequence(cache_path: str, params: dict) -> list:
                 judged_bbox = np.asarray(ai_list, dtype=np.float32)
 
             track_state = sm.step(conf)
+            # Bug 5 fix: feed live IMM maneuver probability so the maneuver
+            # bypass boost, alpha-gate Singer escape and D1 pi-injection are
+            # actually exercised in replay (previously stuck at 0.0).
+            _mu_now = np.array(kf.get_model_probabilities(), dtype=np.float32)
+            _p_maneuver = float(_mu_now[1] + _mu_now[2])
             step = step_guided_imm(
                 kf,
                 dec,
@@ -224,6 +249,7 @@ def replay_sequence(cache_path: str, params: dict) -> list:
                 r_exponent=r_exponent,
                 conf_bypass_threshold=conf_bypass_threshold,
                 innovation_threshold=innovation_threshold,
+                maneuver_probability=_p_maneuver,
                 maneuver_threshold=maneuver_threshold,
                 maneuver_bypass_boost=maneuver_bypass_boost,
                 mahal_chi2_threshold=mahal_chi2_threshold,
@@ -235,6 +261,14 @@ def replay_sequence(cache_path: str, params: dict) -> list:
                 alpha_gate_k_conf=alpha_gate_k_conf,
                 alpha_gate_lambda=alpha_gate_lambda,
                 reacq_r_decay=reacq_r_decay,
+                # Bug 6 fix: D1 maneuver pi-injection now reachable in replay.
+                maneuver_pi_enabled=maneuver_pi_enabled,
+                maneuver_pi_thr=maneuver_pi_thr,
+                maneuver_pi_persist=maneuver_pi_persist,
+                maneuver_pi_singer_boost=maneuver_pi_singer_boost,
+                normal_pi_persist=normal_pi_persist,
+                vel_gate_min_speed=vel_gate_min_speed,
+                vel_gate_cos_thr=vel_gate_cos_thr,
                 # Dynamic bypass
                 mahal_bypass_conf_thr=mahal_bypass_conf_thr,
                 mahal_bypass_vel_thr=mahal_bypass_vel_thr,

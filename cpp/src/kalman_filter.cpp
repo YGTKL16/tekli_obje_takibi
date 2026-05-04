@@ -148,11 +148,25 @@ const StateVec& KalmanFilter::update(const MeasVec& z) noexcept {
         const MeasVec y = z_safe - H_ * x_;
 
         // Innovation covariance: S = H * P * H^T + R
-        const MeasCovMat S = H_ * P_ * H_.transpose() + R_;
+        MeasCovMat S = H_ * P_ * H_.transpose() + R_;
+        S = 0.5F * (S + S.transpose());
 
         // Kalman gain: K = P * H^T * S^(-1)  (via Cholesky for stability)
-        const KalmanGain K = P_ * H_.transpose()
-            * S.llt().solve(MeasCovMat::Identity());
+        // Trap: if S is not PD, add regularisation and retry; if still
+        // singular, skip the update and keep the predicted state.
+        const Eigen::LLT<MeasCovMat> llt(S);
+        KalmanGain K;
+        if (llt.info() == Eigen::Success) {
+            K = P_ * H_.transpose() * llt.solve(MeasCovMat::Identity());
+        } else {
+            S += 1e-6F * MeasCovMat::Identity();
+            const Eigen::LLT<MeasCovMat> llt2(S);
+            if (llt2.info() != Eigen::Success) {
+                // Both attempts failed — keep predicted state, skip update.
+                return x_;
+            }
+            K = P_ * H_.transpose() * llt2.solve(MeasCovMat::Identity());
+        }
 
         // State update: x = x + K * y
         x_ = x_ + K * y;
@@ -171,12 +185,12 @@ const StateVec& KalmanFilter::update(const MeasVec& z, float confidence) noexcep
         return update(z);
     }
 
-    // Use 0.001F as minimum to avoid division-by-zero; floor is now the neutral point
-    // (multiplier=1.0 when conf==floor), not a clamp floor. Allows R inflation for conf < floor.
+    // Bug 3 fix: clamp multiplier to [1.0, cap]. Never deflate R below baseline.
     const float eff_conf = std::max(confidence, 0.001F);
 
     const MeasCovMat R_saved = R_;
-    const float multiplier = std::min(adaptive_r_floor_ / eff_conf, adaptive_r_cap_);
+    const float raw = adaptive_r_floor_ / eff_conf;
+    const float multiplier = std::min(std::max(raw, 1.0F), adaptive_r_cap_);
     R_ = R_saved * multiplier;
     static_cast<void>(update(z));
     R_ = R_saved;
@@ -188,30 +202,67 @@ void KalmanFilter::apply_gmc(const HomMat& H) noexcept {
     if (!initialized_) { return; }
     if (!hom_is_safe(H)) { return; }
 
-    // Top-left (x, y) + (w, h) bbox convention. Warp the centre; size untouched.
+    // Affine 2×2 block.  Bug 1b fix: scale w/h by sqrt(|det|) so the bbox
+    // tracks zoom-in/zoom-out camera motion.  Velocities and accelerations
+    // transform via the same 2×2 block.
+    const float a = H(0, 0), b = H(0, 1);
+    const float c = H(1, 0), d = H(1, 1);
+    const float det_abs = std::abs(a * d - b * c);
+    // F9: floor at 1e-6 (was 1e-12). 1e-12 sqrt -> 1e-6 scale -> bbox shrinks to
+    // sub-pixel and cannot recover. 1e-6 sqrt -> 1e-3 scale, still degenerate but
+    // bounded; near-singular GMC is detected upstream and should bypass anyway.
+    const float s = std::sqrt(std::max(det_abs, 1e-6F));
+
+    // ── 1. Warp centre projectively (handles affine + perspective) ─
     const float w_half = 0.5F * x_(2);
     const float h_half = 0.5F * x_(3);
     const float cx = x_(0) + w_half;
     const float cy = x_(1) + h_half;
-
-    const float pz   = H(2, 0) * cx + H(2, 1) * cy + H(2, 2);
+    const float pz = H(2, 0) * cx + H(2, 1) * cy + H(2, 2);
     if (std::abs(pz) < 1e-9F) { return; }
-    const float cx_n = (H(0, 0) * cx + H(0, 1) * cy + H(0, 2)) / pz;
-    const float cy_n = (H(1, 0) * cx + H(1, 1) * cy + H(1, 2)) / pz;
+    const float cx_n = (a * cx + b * cy + H(0, 2)) / pz;
+    const float cy_n = (c * cx + d * cy + H(1, 2)) / pz;
 
-    // Warp (cx+vx, cy+vy) to get new velocity (difference of warps).
-    const float qx  = cx + x_(4);
-    const float qy  = cy + x_(5);
-    const float qz  = H(2, 0) * qx + H(2, 1) * qy + H(2, 2);
-    if (std::abs(qz) < 1e-9F) { return; }
-    const float qxn = (H(0, 0) * qx + H(0, 1) * qy + H(0, 2)) / qz;
-    const float qyn = (H(1, 0) * qx + H(1, 1) * qy + H(1, 2)) / qz;
+    // ── 2. State warp: pos via centre+size, size by s, vel/acc via 2×2 block ─
+    const float w_new = s * x_(2);
+    const float h_new = s * x_(3);
+    const float vx_old = x_(4), vy_old = x_(5);
+    const float ax_old = x_(8), ay_old = x_(9);
 
-    x_(0) = cx_n - w_half;
-    x_(1) = cy_n - h_half;
-    x_(4) = qxn - cx_n;
-    x_(5) = qyn - cy_n;
-    // w, h, vw, vh, ax, ay intentionally unchanged — see header doc.
+    x_(0) = cx_n - 0.5F * w_new;
+    x_(1) = cy_n - 0.5F * h_new;
+    x_(2) = w_new;
+    x_(3) = h_new;
+    x_(4) = a * vx_old + b * vy_old;
+    x_(5) = c * vx_old + d * vy_old;
+    x_(6) *= s;
+    x_(7) *= s;
+    x_(8) = a * ax_old + b * ay_old;
+    x_(9) = c * ax_old + d * ay_old;
+
+    // ── 3. Bug 1 fix: propagate covariance — P ← J · P · Jᵀ ─
+    // Jacobian of the affine warp on the state vector.  For (x_new,y_new) we
+    // use the centre+size derivation: x_new = a·(x+w/2) + b·(y+h/2) + tx − s·w/2.
+    StateMat J = StateMat::Zero();
+    // Position rows
+    J(0, 0) = a;  J(0, 1) = b;  J(0, 2) = 0.5F * (a - s);  J(0, 3) = 0.5F * b;
+    J(1, 0) = c;  J(1, 1) = d;  J(1, 2) = 0.5F * c;        J(1, 3) = 0.5F * (d - s);
+    // Size
+    J(2, 2) = s;
+    J(3, 3) = s;
+    // Velocity
+    J(4, 4) = a;  J(4, 5) = b;
+    J(5, 4) = c;  J(5, 5) = d;
+    // Size velocity
+    J(6, 6) = s;
+    J(7, 7) = s;
+    // Acceleration
+    J(8, 8) = a;  J(8, 9) = b;
+    J(9, 8) = c;  J(9, 9) = d;
+
+    P_ = J * P_ * J.transpose();
+    // Symmetrise after multiplication (Trap 5).
+    P_ = 0.5F * (P_ + P_.transpose());
 }
 
 void KalmanFilter::set_gmc_failed(bool failed) noexcept {

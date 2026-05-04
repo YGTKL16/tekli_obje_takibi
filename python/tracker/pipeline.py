@@ -28,6 +28,7 @@ from .imm_policy import (
 )
 from .preprocess import apply_roi_clahe
 from .sglatrack_wrapper import DEFAULT_CHECKPOINT_PATH, SGLATrackWrapper
+from .mixformerv2_wrapper import MixFormerV2Wrapper
 from .visualizer import visualize
 
 
@@ -122,6 +123,16 @@ class Pipeline:
         # Velocity direction gate: reject 180° ID-switch detections (0 = disabled)
         vel_gate_min_speed: float = 0.0,
         vel_gate_cos_thr: float = 0.5,
+        # MixFormerV2 late bbox fusion
+        mixformerv2_enabled: bool = False,
+        mixformerv2_fusion_enabled: bool = True,
+        mixformerv2_checkpoint: str | None = None,
+        mixformerv2_config_yaml: str | None = None,
+        mixformerv2_repo_root: str | None = None,
+        mixformerv2_fusion_weight: float = 0.35,
+        mixformerv2_fusion_min_confidence: float = 0.0,
+        mixformerv2_fusion_confidence_weighted: bool = True,
+        mixformerv2_search_factor: float | None = None,
         # ORU: OC-SORT re-update backfill (forwarded to OruConfig.from_dict)
         oru_config: "dict | None" = None,
         # Chaos trigger: confidence volatility → adaptive-R inflation
@@ -184,6 +195,26 @@ class Pipeline:
             association_iou_threshold=association_iou_threshold,
             association_score_weight=association_score_weight,
         )
+        self.mixformerv2_fusion_enabled = bool(
+            mixformerv2_enabled and mixformerv2_fusion_enabled
+        )
+        self.mixformerv2_fusion_weight = float(np.clip(mixformerv2_fusion_weight, 0.0, 1.0))
+        self.mixformerv2_fusion_min_confidence = float(mixformerv2_fusion_min_confidence)
+        self.mixformerv2_fusion_confidence_weighted = bool(
+            mixformerv2_fusion_confidence_weighted
+        )
+        self.mixformerv2 = (
+            MixFormerV2Wrapper(
+                checkpoint_path=mixformerv2_checkpoint,
+                config_path=mixformerv2_config_yaml,
+                repo_root=mixformerv2_repo_root,
+                search_factor=mixformerv2_search_factor,
+            )
+            if mixformerv2_enabled
+            else None
+        )
+        self._last_mixformerv2_bbox: np.ndarray | None = None
+        self._last_mixformerv2_confidence: float = 0.0
         self.decision = DecisionMaker(conf_threshold, iou_threshold)
 
         self.gmc_enabled = bool(gmc_enabled and HAS_CV2)
@@ -340,6 +371,8 @@ class Pipeline:
                     return
 
                 self.ai.init(frame_rgb, np.array(step.bbox, dtype=np.float32))
+                if self.mixformerv2 is not None:
+                    self.mixformerv2.init(frame_rgb, np.array(step.bbox, dtype=np.float32))
                 self._last_refresh_frame = self._frame_count
                 self._moderate_conf_streak = 0
         else:
@@ -388,6 +421,60 @@ class Pipeline:
         self._consecutive_skips = 0
         return False
 
+    @staticmethod
+    def _clip_bbox_to_frame(bbox: np.ndarray, frame_shape) -> np.ndarray:
+        """Clamp an xywh bbox to the image extent."""
+        frame_h, frame_w = frame_shape[:2]
+        clipped = np.asarray(bbox, dtype=np.float32).reshape(4).copy()
+        clipped[2] = float(np.clip(clipped[2], 1.0, max(float(frame_w), 1.0)))
+        clipped[3] = float(np.clip(clipped[3], 1.0, max(float(frame_h), 1.0)))
+        clipped[0] = float(np.clip(clipped[0], 0.0, max(float(frame_w) - clipped[2], 0.0)))
+        clipped[1] = float(np.clip(clipped[1], 0.0, max(float(frame_h) - clipped[3], 0.0)))
+        return clipped
+
+    def _maybe_fuse_mixformerv2(
+        self,
+        frame_rgb: np.ndarray,
+        sgla_bbox,
+        sgla_confidence: float,
+    ) -> tuple[np.ndarray, float]:
+        """Late-fuse SGLATrack and MixFormerV2 bboxes before Decision/KF."""
+        sgla_bbox_arr = np.asarray(sgla_bbox, dtype=np.float32).reshape(4)
+        if not self.mixformerv2_fusion_enabled or self.mixformerv2 is None:
+            return sgla_bbox_arr, float(sgla_confidence)
+
+        mix_bbox, mix_confidence = self.mixformerv2.track(frame_rgb)
+        self._last_mixformerv2_bbox = np.asarray(mix_bbox, dtype=np.float32).reshape(4)
+        self._last_mixformerv2_confidence = float(mix_confidence)
+
+        if mix_confidence < self.mixformerv2_fusion_min_confidence:
+            return sgla_bbox_arr, float(sgla_confidence)
+
+        mix_weight = self.mixformerv2_fusion_weight
+        sgla_weight = 1.0 - mix_weight
+        # F1: floor at 1e-3 to avoid 1e-13 saturation when both confidences ~0
+        if self.mixformerv2_fusion_confidence_weighted:
+            sgla_weight *= max(float(sgla_confidence), 1e-3)
+            mix_weight *= max(float(mix_confidence), 1e-3)
+
+        total_weight = sgla_weight + mix_weight
+        # F1: stricter floor + isfinite guard on inputs
+        if total_weight <= 1e-6 or not np.isfinite(total_weight):
+            return sgla_bbox_arr, float(sgla_confidence)
+
+        fused_bbox = (sgla_bbox_arr * sgla_weight + self._last_mixformerv2_bbox * mix_weight) / total_weight
+        # F1: bail out if fusion produced non-finite bbox (NaN/Inf in mix bbox)
+        if not np.isfinite(fused_bbox).all():
+            return sgla_bbox_arr, float(sgla_confidence)
+        fused_bbox = self._clip_bbox_to_frame(fused_bbox, frame_rgb.shape)
+        fused_confidence = (
+            float(sgla_confidence) * sgla_weight + float(mix_confidence) * mix_weight
+        ) / total_weight
+        if not np.isfinite(fused_confidence):
+            fused_confidence = float(sgla_confidence)
+        self.mixformerv2.set_state(fused_bbox)
+        return fused_bbox.astype(np.float32), float(fused_confidence)
+
     def run(self):
         """Run the tracking loop."""
         if not HAS_CV2:
@@ -415,6 +502,8 @@ class Pipeline:
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         self.ai.init(frame_rgb, self.initial_bbox)
+        if self.mixformerv2 is not None:
+            self.mixformerv2.init(frame_rgb, self.initial_bbox)
         self.kf.init(self.initial_bbox)
         self.state_machine.force_tracking()
         self._prev_frame_bgr = frame.copy() if self.gmc_enabled else None
@@ -552,6 +641,13 @@ class Pipeline:
                     confidence = observation.confidence
                     observed_bbox = ai_bbox
                 self._consecutive_skips = 0
+            if not skip_ai and observed_bbox is not None:
+                observed_bbox, confidence = self._maybe_fuse_mixformerv2(
+                    frame_rgb,
+                    observed_bbox,
+                    confidence,
+                )
+                ai_bbox = observed_bbox
             t_ai = (time.perf_counter_ns() - t0) / 1e6
             self.timings["ai"].append(t_ai)
 
@@ -618,6 +714,10 @@ class Pipeline:
             self._reject_streak = step.reject_streak
             self._last_good_bbox = step.last_good_bbox
 
+            # F5 closed-loop feedback: feed KF-blended bbox back to SGLATrack
+            # search window so the AI always centres on the filtered estimate.
+            self.ai.set_state(np.array(step.bbox, dtype=np.float32))
+
             # ORU hook D: snapshot after accepted TRACKING update
             if step.accepted_measurement and track_state == tracker_cpp.TrackState.TRACKING and observed_bbox is not None:
                 self._oru.push_snapshot(
@@ -641,6 +741,8 @@ class Pipeline:
                 rescue_area = step.bbox[2] * step.bbox[3]
                 if self.rescue_min_area <= 0.0 or rescue_area >= self.rescue_min_area:
                     self.ai.init(frame_rgb, np.array(step.bbox, dtype=np.float32))
+                    if self.mixformerv2 is not None:
+                        self.mixformerv2.init(frame_rgb, np.array(step.bbox, dtype=np.float32))
                 self._moderate_conf_streak = 0
             else:
                 self._maybe_refresh_template(frame_rgb, confidence, step)

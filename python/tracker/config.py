@@ -110,6 +110,16 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     # Velocity direction gate: reject 180° ID-switch detections (0 = disabled)
     "vel_gate_min_speed": 0.0,  # min KF speed px/frame to arm gate [2, 20]
     "vel_gate_cos_thr": 0.5,    # reject when cos(angle) < -thr (>120°) [0.3, 0.8]
+    # MixFormerV2 late bbox fusion (disabled unless mixformerv2.enabled=true)
+    "mixformerv2_enabled": False,
+    "mixformerv2_fusion_enabled": True,
+    "mixformerv2_checkpoint": "models/MixFormerV2/models/mixformerv2_small.pth.tar",
+    "mixformerv2_config_yaml": "models/MixFormerV2/experiments/mixformer2_vit_online/224_depth4_mlp1_score.yaml",
+    "mixformerv2_repo_root": "models/MixFormerV2",
+    "mixformerv2_fusion_weight": 0.35,
+    "mixformerv2_fusion_min_confidence": 0.0,
+    "mixformerv2_fusion_confidence_weighted": True,
+    "mixformerv2_search_factor": None,
     # Velocity-relative innovation gate: force coast when center_innov / kf_speed > thr
     # 0 = disabled.  Fires only in normal (non-bypass) path to block ID-switch on
     # stationary targets (truck_night style).
@@ -117,12 +127,15 @@ DEFAULT_RUNTIME_PARAMS: dict[str, Any] = {
     "vel_innov_min_speed": 1.0,   # floor for kf_speed denominator (px/frame)
     "vel_innov_min_innov": 0.0,   # minimum absolute center innov (px) to fire gate; 0=no min
     "accept_bbox_raw": False,     # output raw AI obs (not KF state) on accepted frames
+    "conf_mahal_escape_thr": 0.0, # skip Mahal gate on first rejection when conf >= thr (0=disabled)
     "f5_obs_size": False,         # f5 feedback uses AI obs size + KF position (fixes size-lag)
     "f5_coast_only": False,       # f5 feedback only fires during coasting (reject_streak > 0)
     # ORU backfill: raw sub-dict forwarded to OruConfig.from_dict() (empty = defaults)
     "oru_config": {},
     # Chaos trigger: raw sub-dict forwarded to ChaosConfig.from_dict() (empty = disabled)
     "chaos_config": {},
+    # Startup grace: keep state TRACKING for first N frames (0 = disabled)
+    "startup_grace_frames": 0,
 }
 
 
@@ -173,6 +186,7 @@ def normalize_runtime_config(
     association = _as_mapping(cfg.get("association"))
     ai = _as_mapping(cfg.get("ai"))
     coasting = _as_mapping(cfg.get("coasting"))
+    startup = _as_mapping(cfg.get("startup"))
 
     canonical_conf_threshold = _first_non_none(
         decision.get("confidence_threshold"),
@@ -600,6 +614,43 @@ def normalize_runtime_config(
     if v is not None:
         params["vel_gate_cos_thr"] = float(v)
 
+    # MixFormerV2 late bbox fusion
+    mixformerv2 = _as_mapping(cfg.get("mixformerv2"))
+    mixformerv2_fusion = _as_mapping(mixformerv2.get("fusion"))
+    v = mixformerv2.get("enabled")
+    if v is not None:
+        params["mixformerv2_enabled"] = bool(v)
+    v = _first_non_none(mixformerv2_fusion.get("enabled"), mixformerv2.get("fusion_enabled"))
+    if v is not None:
+        params["mixformerv2_fusion_enabled"] = bool(v)
+    v = mixformerv2.get("checkpoint")
+    if v is not None:
+        params["mixformerv2_checkpoint"] = str(v)
+    v = _first_non_none(mixformerv2.get("config_yaml"), mixformerv2.get("config"))
+    if v is not None:
+        params["mixformerv2_config_yaml"] = str(v)
+    v = mixformerv2.get("repo_root")
+    if v is not None:
+        params["mixformerv2_repo_root"] = str(v)
+    v = _first_non_none(mixformerv2_fusion.get("weight"), mixformerv2.get("fusion_weight"))
+    if v is not None:
+        params["mixformerv2_fusion_weight"] = float(v)
+    v = _first_non_none(
+        mixformerv2_fusion.get("min_confidence"),
+        mixformerv2.get("fusion_min_confidence"),
+    )
+    if v is not None:
+        params["mixformerv2_fusion_min_confidence"] = float(v)
+    v = _first_non_none(
+        mixformerv2_fusion.get("confidence_weighted"),
+        mixformerv2.get("fusion_confidence_weighted"),
+    )
+    if v is not None:
+        params["mixformerv2_fusion_confidence_weighted"] = bool(v)
+    v = mixformerv2.get("search_factor")
+    if v is not None:
+        params["mixformerv2_search_factor"] = float(v)
+
     # Velocity-relative innovation gate (vel_innov: block or top-level keys)
     vel_innov_block = _as_mapping(cfg.get("vel_innov"))
     v = _first_non_none(vel_innov_block.get("ratio_gate"), cfg.get("vel_innov_ratio_gate"))
@@ -614,6 +665,9 @@ def normalize_runtime_config(
     v = cfg.get("accept_bbox_raw")
     if v is not None:
         params["accept_bbox_raw"] = bool(v)
+    v = _first_non_none(smart.get("conf_mahal_escape_thr"), cfg.get("conf_mahal_escape_thr"))
+    if v is not None:
+        params["conf_mahal_escape_thr"] = float(v)
     v = cfg.get("f5_obs_size")
     if v is not None:
         params["f5_obs_size"] = bool(v)
@@ -630,6 +684,14 @@ def normalize_runtime_config(
     chaos_block = _as_mapping(cfg.get("chaos"))
     if chaos_block:
         params["chaos_config"] = dict(chaos_block)
+
+    # Startup grace period
+    startup_grace = _first_non_none(
+        startup.get("startup_grace_frames"),
+        cfg.get("startup_grace_frames"),
+    )
+    if startup_grace is not None:
+        params["startup_grace_frames"] = int(startup_grace)
 
     return params
 

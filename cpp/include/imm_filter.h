@@ -45,7 +45,8 @@ public:
     /// Adaptive-R IMM update: R scaled by 1 / max(conf, adaptive_r_floor_).
     [[nodiscard]] const StateVec& update(const MeasVec& z, float confidence) noexcept;
 
-    /// Warp all per-model state means by a 3×3 homography (prev → curr).
+    /// Warp all per-model state means and covariances by a 3×3 homography
+    /// (prev → curr).
     void apply_gmc(const HomMat& H) noexcept;
 
     /// Flag that GMC failed this frame. Next predict() uses Q*gmc_q_boost across

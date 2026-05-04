@@ -1,8 +1,13 @@
 import os
 import sys
 import importlib.util
+import types
+import warnings
+from contextlib import contextmanager
 
 import numpy as np
+
+from ._finite import assert_finite
 
 # Project root (tracker/)
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -38,6 +43,50 @@ def _load_processing_utils():
     return module.sample_target, module.transform_image_to_crop
 
 
+@contextmanager
+def _checkpoint_safe_globals(torch_module):
+    """Allow upstream training metadata while loading tensor-only weights."""
+    module_names = (
+        "lib.train",
+        "lib.train.admin",
+        "lib.train.admin.stats",
+        "lib.train.admin.settings",
+        "lib.train.admin.local",
+    )
+    previous_modules = {name: sys.modules.get(name) for name in module_names}
+
+    for package_name in ("lib.train", "lib.train.admin"):
+        sys.modules.setdefault(package_name, types.ModuleType(package_name))
+
+    safe_classes: list[type] = []
+    module_classes = {
+        "lib.train.admin.stats": ("AverageMeter", "StatValue"),
+        "lib.train.admin.settings": ("Settings",),
+        "lib.train.admin.local": ("EnvironmentSettings",),
+    }
+    for module_name, class_names in module_classes.items():
+        module = sys.modules.get(module_name)
+        if module is None:
+            module = types.ModuleType(module_name)
+            sys.modules[module_name] = module
+        for class_name in class_names:
+            cls = getattr(module, class_name, None)
+            if cls is None:
+                cls = type(class_name, (), {"__module__": module_name})
+                setattr(module, class_name, cls)
+            safe_classes.append(cls)
+
+    try:
+        with torch_module.serialization.safe_globals(safe_classes):
+            yield
+    finally:
+        for name, module in previous_modules.items():
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+
+
 class SGLATrackWrapper:
     """Wraps SGLATrack model for single-object tracking.
 
@@ -55,6 +104,7 @@ class SGLATrackWrapper:
         association_top_k: int = 5,
         association_iou_threshold: float = 0.3,
         association_score_weight: float = 0.0,
+        tta_flip: bool = False,
     ):
         if checkpoint_path is None:
             checkpoint_path = DEFAULT_CHECKPOINT_PATH
@@ -82,6 +132,7 @@ class SGLATrackWrapper:
         self.association_top_k = association_top_k
         self.association_iou_threshold = association_iou_threshold
         self.association_score_weight = association_score_weight
+        self.tta_flip = tta_flip
         self._ema_patch_f32: np.ndarray | None = None
 
     def _load_model(self):
@@ -120,7 +171,8 @@ class SGLATrackWrapper:
 
         # Build model
         network = build_sglatrack(cfg, training=False)
-        ckpt = torch.load(self.checkpoint_path, map_location="cpu", weights_only=False)
+        with _checkpoint_safe_globals(torch):
+            ckpt = torch.load(self.checkpoint_path, map_location="cpu", weights_only=True)
         network.load_state_dict(ckpt["net"], strict=True)
 
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -163,6 +215,26 @@ class SGLATrackWrapper:
         z_patch, resize_factor, z_amask = self._sample_target(
             frame, self._state, self.template_factor, output_sz=self.template_size
         )
+        # F6: warn on degenerate init template (blank frame, near-zero variance,
+        # or non-finite values) — silent garbage template is a known failure mode.
+        try:
+            z_arr = np.asarray(z_patch)
+            if z_arr.size > 0:
+                if not np.isfinite(z_arr).all():
+                    warnings.warn(
+                        "[SGLATrack.init] non-finite values in init template patch",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                elif float(z_arr.std()) < 1e-3:
+                    warnings.warn(
+                        "[SGLATrack.init] near-uniform init template patch "
+                        f"(std={float(z_arr.std()):.3e}); tracking may be unreliable",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+        except Exception:  # pragma: no cover - never let diagnostics break init
+            pass
         with self._torch.no_grad():
             self._z_dict = self.preprocessor.process(z_patch, z_amask)
 
@@ -206,10 +278,19 @@ class SGLATrackWrapper:
             frame_rgb, bbox_list, self.template_factor, output_sz=self.template_size
         )
         patch_f32 = z_patch.astype(np.float32)
+        # F4: skip EMA update if incoming patch is non-finite to avoid poisoning
+        # the buffer with NaN/Inf that would propagate forever.
+        if not np.isfinite(patch_f32).all():
+            assert_finite("sglatrack.update_template_ema.patch", patch_f32)
+            return
         if self._ema_patch_f32 is None:
             self._ema_patch_f32 = patch_f32.copy()
         else:
-            self._ema_patch_f32 = alpha * patch_f32 + (1.0 - alpha) * self._ema_patch_f32
+            blended_buf = alpha * patch_f32 + (1.0 - alpha) * self._ema_patch_f32
+            if not np.isfinite(blended_buf).all():
+                assert_finite("sglatrack.update_template_ema.blend", blended_buf)
+                return
+            self._ema_patch_f32 = blended_buf
         blended = np.clip(self._ema_patch_f32, 0.0, 255.0).astype(np.uint8)
         with self._torch.no_grad():
             self._z_dict = self.preprocessor.process(blended, z_amask)
@@ -229,8 +310,52 @@ class SGLATrackWrapper:
                 ce_template_mask=self._box_mask_z,
             )
 
-        response = self.output_window * out_dict["score_map"]
-        return response, out_dict["size_map"], out_dict["offset_map"], resize_factor, H, W
+        # F3: scrub NaN/Inf from network outputs before window weighting.
+        # nan_to_num is a no-op for clean tensors, so cost is negligible.
+        score_map = self._torch.nan_to_num(
+            out_dict["score_map"], nan=0.0, posinf=0.0, neginf=0.0
+        )
+        size_map = self._torch.nan_to_num(
+            out_dict["size_map"], nan=0.0, posinf=0.0, neginf=0.0
+        )
+        offset_map = self._torch.nan_to_num(
+            out_dict["offset_map"], nan=0.0, posinf=0.0, neginf=0.0
+        )
+        response = self.output_window * score_map
+
+        if self.tta_flip:
+            # Horizontal flip TTA: run inference on left-right flipped search patch,
+            # un-flip the outputs, then average with the original pass.
+            x_patch_f = x_patch[:, ::-1, :].copy()  # flip width axis (H, W, C)
+            with self._torch.no_grad():
+                x_dict_f = self.preprocessor.process(x_patch_f, x_amask)
+                out_dict_f = self.network(
+                    template=self._z_dict.tensors,
+                    search=x_dict_f.tensors,
+                    ce_template_mask=self._box_mask_z,
+                )
+            sm_f = self._torch.nan_to_num(out_dict_f["score_map"], nan=0.0, posinf=0.0, neginf=0.0)
+            sz_f = self._torch.nan_to_num(out_dict_f["size_map"], nan=0.0, posinf=0.0, neginf=0.0)
+            om_f = self._torch.nan_to_num(out_dict_f["offset_map"], nan=0.0, posinf=0.0, neginf=0.0)
+            resp_f = self.output_window * sm_f
+
+            # Un-flip spatial dimension (last dim = width):
+            # score/response: symmetric under flip
+            resp_f_uf = resp_f.flip(-1)
+            # size_map channels: [0]=w_pred, [1]=h_pred — values are unchanged,
+            # spatial positions mirror
+            sz_f_uf = sz_f.flip(-1)
+            # offset_map channels: [0]=x_offset negates and mirrors, [1]=y_offset mirrors
+            om_f_uf = self._torch.cat(
+                [-om_f[:, 0:1].flip(-1), om_f[:, 1:2].flip(-1)], dim=1
+            )
+
+            # Average both passes
+            response = 0.5 * (response + resp_f_uf)
+            size_map = 0.5 * (size_map + sz_f_uf)
+            offset_map = 0.5 * (offset_map + om_f_uf)
+
+        return response, size_map, offset_map, resize_factor, H, W
 
     def _decode_bbox_from_index(
         self,

@@ -129,6 +129,7 @@ def main():
     parser.add_argument("--pred", default=os.path.join(PROJECT_ROOT, "outputs", "submission_train.csv"),
                         help="Prediction CSV path")
     parser.add_argument("--seq", default=None, help="Evaluate single sequence")
+    parser.add_argument("--split", default=None, help="Only evaluate sequences from this split (e.g. public_lb)")
     args = parser.parse_args()
 
     manifest = load_manifest()
@@ -154,7 +155,13 @@ def main():
 
         gt_bboxes = load_gt(seq_id, manifest)
         if gt_bboxes is None:
-            continue  # Skip non-train sequences
+            continue  # Skip sequences without annotation
+
+        if args.split:
+            # Only evaluate sequences belonging to the requested split
+            split_seqs = manifest.get(args.split, {})
+            if seq_id not in split_seqs:
+                continue
 
         # Convert pred dict to ordered list
         pred_dict = seq_preds[seq_id]

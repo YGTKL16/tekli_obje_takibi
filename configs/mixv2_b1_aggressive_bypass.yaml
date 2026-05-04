@@ -1,8 +1,6 @@
-# Optuna-tuned unified IMM parameters (22D, LODO CV)
-# Saved: C1 (guard fallback)  FinalScore=0.6565
-# AI-only=0.6685  Default-IMM=0.6423  Optuna=0.6561  C1=0.6565
-# Delta vs AI-only: -0.0120
-# Trials: 500, Sequences: 199, Folds: 5
+# MixV2 B1: Aggressive bypass — let MixV2 dominate when confident
+# Baseline: imm_tuned (FinalScore=0.6898 with MixV2)
+# Hypothesis: MixV2 high-conf outputs being over-smoothed; lower bypass thr.
 
 imm:
   q_scale: 31.113513
@@ -29,7 +27,7 @@ hygiene:
   aspect_ratio_hi: 7.099779
 
 smart_intervention:
-  conf_bypass_threshold: 0.740469
+  conf_bypass_threshold: 0.50    # MUTATION: 0.74 → 0.50 (MixV2 mostly >0.9 when correct)
   innovation_threshold: 1.454772
   sm_conf_threshold: 0.155357
   sm_max_coast: 69
@@ -40,5 +38,3 @@ soft_fusion:
   alpha_gate_k_conf: 0.000000
   alpha_gate_lambda: 0.000000
   reacq_r_decay: 0.000000
-
-

@@ -1,8 +1,8 @@
-# Optuna-tuned unified IMM parameters (22D, LODO CV)
-# Saved: C1 (guard fallback)  FinalScore=0.6565
-# AI-only=0.6685  Default-IMM=0.6423  Optuna=0.6561  C1=0.6565
-# Delta vs AI-only: -0.0120
-# Trials: 500, Sequences: 199, Folds: 5
+# C4: raise bypass to 0.85 (force more blend frames) + F5 pos-only feedback.
+# Lets KF anchor position on borderline frames; AI keeps size authority.
+
+f5_feedback: true
+f5_pos_only: true
 
 imm:
   q_scale: 31.113513
@@ -29,16 +29,17 @@ hygiene:
   aspect_ratio_hi: 7.099779
 
 smart_intervention:
-  conf_bypass_threshold: 0.740469
+  conf_bypass_threshold: 0.85
   innovation_threshold: 1.454772
   sm_conf_threshold: 0.155357
   sm_max_coast: 69
   maneuver_threshold: 0.400000
   maneuver_bypass_boost: 0.100000
 
+mahalanobis:
+  bypass_after: 0
+
 soft_fusion:
   alpha_gate_k_conf: 0.000000
   alpha_gate_lambda: 0.000000
   reacq_r_decay: 0.000000
-
-

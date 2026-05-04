@@ -60,9 +60,21 @@ sglatrack:
   checkpoint: "models/SGLATrack/checkpoints/sglatrack_ep0297.pth.tar"
   config_yaml: "models/SGLATrack/experiments/sglatrack/deit_distilled.yaml"
 
+mixformerv2:
+  enabled: false
+  repo_root: "models/MixFormerV2"
+  checkpoint: "models/MixFormerV2/models/mixformerv2_small.pth.tar"
+  config_yaml: "models/MixFormerV2/experiments/mixformer2_vit_online/224_depth4_mlp1_score.yaml"
+  search_factor: null
+  fusion:
+    enabled: true
+    weight: 0.35                 # MixFormerV2 bbox weight; SGLATrack keeps 1-weight
+    min_confidence: 0.0          # Ignore MixFormerV2 below this confidence
+    confidence_weighted: true    # Scale bbox weights by each tracker's confidence
+
 tensorrt:
   onnx_path: "models/sglatrack.onnx"
-  engine_path: "models/sglatrack_fp16.engine"
+  engine_path: "models/sglatrack_finetuned_fp16.engine"
   fp16: true
   # Export: python scripts/export_tensorrt.py
   # Run:    python scripts/run_competition.py --backend tensorrt

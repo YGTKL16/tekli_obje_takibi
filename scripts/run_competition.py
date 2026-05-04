@@ -157,6 +157,8 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
             return
 
     seq_init_area = float(init_bbox[2]) * float(init_bbox[3])
+    if not np.isfinite(seq_init_area) or seq_init_area <= 0.0:
+        seq_init_area = 1.0
     seq_init_w = float(init_bbox[2])
     seq_init_h = float(init_bbox[3])
 
@@ -170,7 +172,9 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
     _f5_start_thr = float(_raw_cfg.get("f5_startup_vel_thr", 0.10))
     _f5_full_thr  = float(_raw_cfg.get("f5_startup_full_thr", 0.25))
     if _f5_sw > 0 and seq_init_area > 0.0 and ann_path and len(annotations) >= _f5_sw:
-        _diag = float(np.sqrt(seq_init_area))
+        # F5: floor at 1.0 px to avoid degenerate diag (sub-pixel init box) producing
+        # huge normalized velocities and unintended F5 suppression toggles.
+        _diag = float(np.sqrt(max(seq_init_area, 1.0)))
         _d_start: "list[float]" = []
         for _fi in range(1, min(_f5_sw + 1, len(annotations))):
             _bp = annotations[_fi - 1]; _bc = annotations[_fi]
@@ -443,6 +447,13 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                     # ─────────────────────────────────────────────────────────
                     track_state = state_machine.step(conf)
 
+                    # Startup grace: keep TRACKING for first N frames so AI
+                    # template has time to warm up before coasting is allowed.
+                    _startup_grace = int(runtime_params.get("startup_grace_frames", 0))
+                    if _startup_grace > 0 and frame_idx <= _startup_grace:
+                        state_machine.force_tracking()
+                        track_state = tracking_state_enum
+
                     # ── ORU hooks: state-transition detection ────────────────
                     if _prev_track_state is not None:
                         _is_tracking = (track_state == tracking_state_enum)
@@ -588,6 +599,13 @@ def run_tracker_on_sequence(tracker, seq_id, seq_info, results,
                             _drift_obs_cy = float("nan")
                     # ─────────────────────────────────────────────────────────
                     track_state = state_machine.step(conf)
+
+                    # Startup grace: keep TRACKING for first N frames so AI
+                    # template has time to warm up before coasting is allowed.
+                    _startup_grace = int(runtime_params.get("startup_grace_frames", 0))
+                    if _startup_grace > 0 and frame_idx <= _startup_grace:
+                        state_machine.force_tracking()
+                        track_state = tracking_state_enum
 
                     # ── ORU hooks: state-transition detection ────────────────
                     if _prev_track_state is not None:
@@ -775,8 +793,8 @@ def main():
                         help="Path to SGLATrack checkpoint (.pth.tar)")
     parser.add_argument("--output", default=None, help="Output CSV path")
     parser.add_argument("--device", default="cuda", help="Device (cuda/cpu)")
-    parser.add_argument("--backend", default="tensorrt", choices=["pytorch", "tensorrt"],
-                        help="Inference backend")
+    parser.add_argument("--backend", default="tensorrt", choices=["pytorch", "tensorrt", "mixformerv2"],
+                        help="Inference backend (mixformerv2 = MixFormerV2-Small standalone)")
     parser.add_argument("--engine", default=None, help="TensorRT engine path (for --backend tensorrt)")
     parser.add_argument("--no-kf", action="store_true", help="Disable Kalman filter (raw AI output)")
     parser.add_argument("--conf-threshold", type=float, default=None,
@@ -788,6 +806,9 @@ def main():
     parser.add_argument("--f5-feedback", action="store_true",
                         help="Enable F5 closed-loop feedback (tracker.set_state every frame). "
                              "Default OFF matches pre-F5 prod behaviour.")
+    parser.add_argument("--tta", action="store_true",
+                        help="Enable Test Time Augmentation: average original + horizontal-flip "
+                             "inference passes (2× inference cost, improves robustness)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Random seed for reproducibility")
     args = parser.parse_args()
@@ -832,11 +853,15 @@ def main():
             engine_path=args.engine,
             association_enabled=not args.no_association,
         )
+    elif args.backend == "mixformerv2":
+        from tracker.mixformerv2_wrapper import MixFormerV2Wrapper  # pyright: ignore[reportMissingImports]
+        tracker = MixFormerV2Wrapper()
     else:
         from tracker.sglatrack_wrapper import SGLATrackWrapper  # pyright: ignore[reportMissingImports]
         tracker = SGLATrackWrapper(
             checkpoint_path=args.checkpoint,
             association_enabled=not args.no_association,
+            tta_flip=args.tta,
         )
 
     # Run on all sequences

@@ -1,0 +1,39 @@
+# MixV2 B2: Minimal IMM — let AI dominate, KF only for coasting
+# Lower q (stable trajectory), much lower R (trust AI), high bypass
+
+imm:
+  q_scale: 5.0                   # was 31; lower → smoother trajectory
+  measurement_noise:
+    r_pos_scale: 5.0             # was 44; lower → trust AI position more
+    r_size_scale: 1.0            # was 2.1
+  transition_matrix:
+    pi_persist: 0.97
+
+decision:
+  conf_threshold: 0.15
+  coast_threshold: 0.10
+  max_coast_frames: 60
+
+blend:
+  alpha_conf_lo: 0.50            # blend more toward AI
+  alpha_conf_hi: 0.95            # near-full AI when high conf
+
+hygiene:
+  reinit_after: 5
+  max_area_frac: 0.40
+  max_center_jump_frac: 0.60
+  aspect_ratio_lo: 0.1
+  aspect_ratio_hi: 8.0
+
+smart_intervention:
+  conf_bypass_threshold: 0.40    # very aggressive bypass
+  innovation_threshold: 3.0
+  sm_conf_threshold: 0.13
+  sm_max_coast: 80
+  maneuver_threshold: 0.40
+  maneuver_bypass_boost: 0.10
+
+soft_fusion:
+  alpha_gate_k_conf: 0.0
+  alpha_gate_lambda: 0.0
+  reacq_r_decay: 0.0

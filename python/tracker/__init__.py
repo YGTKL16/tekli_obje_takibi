@@ -9,8 +9,9 @@ if TYPE_CHECKING:
     from .pipeline import Pipeline as Pipeline
     from .sglatrack_wrapper import SGLATrackWrapper as SGLATrackWrapper
     from .trt_wrapper import TRTTrackWrapper as TRTTrackWrapper
+    from .mixformerv2_wrapper import MixFormerV2Wrapper as MixFormerV2Wrapper
 
-__all__ = ["Pipeline", "DecisionMaker", "SGLATrackWrapper", "TRTTrackWrapper"]
+__all__ = ["Pipeline", "DecisionMaker", "SGLATrackWrapper", "TRTTrackWrapper", "MixFormerV2Wrapper"]
 
 
 def __getattr__(name):
@@ -26,4 +27,7 @@ def __getattr__(name):
     if name == "TRTTrackWrapper":
         from .trt_wrapper import TRTTrackWrapper
         return TRTTrackWrapper
+    if name == "MixFormerV2Wrapper":
+        from .mixformerv2_wrapper import MixFormerV2Wrapper
+        return MixFormerV2Wrapper
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

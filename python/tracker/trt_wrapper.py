@@ -122,7 +122,7 @@ class TRTTrackWrapper:
         association_score_weight: float = 0.0,
     ):
         if engine_path is None:
-            engine_path = os.path.join(_PROJECT_ROOT, "models", "sglatrack_fp16.engine")
+            engine_path = os.path.join(_PROJECT_ROOT, "models", "sglatrack_ep32_fp16.engine")
         self.engine_path = os.path.abspath(engine_path)
         self.initialized = False
         self._engine_loaded = False
